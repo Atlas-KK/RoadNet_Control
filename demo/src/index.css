@@ -1,0 +1,424 @@
+@import 'tailwindcss';
+
+/* Arco Design System tokens adapted from Figma node 120463:106317 (Card). */
+@theme {
+  --color-brand: #4080FF;
+  --color-brand-50: #E8F3FF;
+  --color-brand-100: #BEDAFF;
+  --color-brand-200: #94BFFF;
+  --color-brand-700: #165DFF;
+
+  --color-graph: #722ED1;
+  --color-graph-50: #F5EFFF;
+  --color-graph-100: #DDBEFF;
+
+  --color-pass: #00B42A;
+  --color-pass-50: #E8FFEA;
+  --color-pass-100: #AFF0B5;
+
+  --color-warn: #FF7D00;
+  --color-warn-50: #FFF7E8;
+  --color-warn-100: #FFE4BA;
+
+  --color-danger: #F53F3F;
+  --color-danger-50: #FFECE8;
+  --color-danger-100: #FDCDC5;
+
+  --color-ink: #1D2129;
+  --color-ink-soft: #4E5969;
+  --color-ink-muted: #86909C;
+  --color-ink-disabled: #C9CDD4;
+  --color-panel: #FFFFFF;
+  --color-panel-2: #F7F8FA;
+  --color-line: #E5E6E8;
+  --color-canvas: #F2F3F5;
+
+  --font-sans: 'PingFang SC', 'Nunito Sans', 'Microsoft YaHei', 'Segoe UI', Arial, sans-serif;
+  --font-mono: 'Cascadia Code', 'Consolas', ui-monospace, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5715;
+  color: var(--color-ink);
+  background: var(--color-canvas);
+  overflow: hidden;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-shell {
+  background: var(--color-canvas);
+}
+
+::selection {
+  color: #ffffff;
+  background: var(--color-brand);
+}
+
+button {
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    opacity 160ms ease;
+}
+
+button:hover {
+  filter: none;
+}
+
+button:active {
+  transform: none;
+}
+
+button:focus-visible,
+[role='button']:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  color: var(--color-ink);
+  accent-color: var(--color-brand);
+  background: var(--color-panel);
+  border-color: var(--color-line);
+}
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.arco-button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  background: var(--color-panel);
+  color: var(--color-ink);
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1;
+  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+}
+
+.arco-button:hover {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+  background: var(--color-brand-50);
+}
+
+.arco-button-primary {
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+  color: #fff;
+}
+
+.arco-button-primary:hover {
+  border-color: #165DFF;
+  background: #165DFF;
+  color: #fff;
+}
+
+.arco-button-outline {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+}
+
+.arco-button-danger {
+  border-color: var(--color-danger-100);
+  background: var(--color-danger-50);
+  color: var(--color-danger);
+}
+
+.arco-button-size-mini {
+  min-height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.arco-icon {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  font-family: 'Segoe UI Symbol', 'PingFang SC', sans-serif;
+  font-size: 14px;
+  font-style: normal;
+  line-height: 1;
+}
+
+.arco-icon-button {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+
+.arco-input {
+  min-height: 32px;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  background: var(--color-panel);
+  padding: 0 12px;
+  font-size: 14px;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.arco-input:hover,
+.arco-input:focus {
+  border-color: var(--color-brand);
+}
+
+.arco-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgb(22 93 255 / 12%);
+}
+
+.arco-card {
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  background: var(--color-panel);
+  box-shadow: none;
+}
+
+.arco-card-header {
+  min-height: 48px;
+  padding: 0 16px;
+  background: var(--color-panel);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.arco-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  padding: 0 6px;
+  background: var(--color-panel);
+  color: var(--color-ink-soft);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.arco-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  border-radius: 4px;
+  padding: 9px 12px;
+  font-size: 14px;
+}
+
+.arco-alert-info { background: var(--color-brand-50); color: var(--color-brand-700); }
+.arco-alert-success { background: var(--color-pass-50); color: var(--color-pass); }
+.arco-alert-warning { background: var(--color-warn-50); color: var(--color-warn); }
+.arco-alert-error { background: var(--color-danger-50); color: var(--color-danger); }
+
+.step-index {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--color-brand-50);
+  border: 1px solid var(--color-brand-100);
+  color: var(--color-brand-700);
+  font: 700 9px/1 var(--font-mono);
+}
+
+.arco-surface-subtle {
+  border: 1px solid var(--color-line);
+  border-radius: 4px;
+  background: var(--color-panel-2);
+}
+
+.arco-section-title {
+  color: var(--color-ink);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+}
+
+.font-formula {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #C9CDD4;
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #A9AEB8;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.map-legend-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 3px;
+  vertical-align: middle;
+  object-fit: contain;
+}
+
+/* 桌面工作台四列：事件列表 → GIS 数字孪生 → 态势讲解 → 智能处置队列。 */
+.app-main {
+  display: grid;
+  grid-template-columns: 248px minmax(420px, 1.55fr) minmax(256px, 0.7fr) minmax(320px, 0.8fr);
+  gap: 12px;
+}
+
+.app-main.is-triage-collapsed {
+  grid-template-columns: 44px minmax(420px, 1.55fr) minmax(256px, 0.7fr) minmax(320px, 0.8fr);
+}
+
+.app-triage,
+.app-map,
+.app-narrative,
+.app-plan {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.app-map-stack {
+  display: grid;
+  grid-template-rows: minmax(280px, 1.35fr) minmax(220px, 0.85fr);
+  gap: 12px;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-map-canvas,
+.app-infrastructure-monitor {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (max-width: 1440px) and (min-width: 1367px) {
+  .app-main {
+    grid-template-columns: 224px minmax(320px, 1.3fr) minmax(216px, 0.65fr) minmax(264px, 0.74fr);
+    gap: 12px;
+  }
+
+  .app-main.is-triage-collapsed {
+    grid-template-columns: 44px minmax(320px, 1.3fr) minmax(216px, 0.65fr) minmax(264px, 0.74fr);
+  }
+
+  .app-triage {
+    width: auto;
+  }
+
+}
+
+/* 1366px 级桌面端保持四栏，但优先确保态势与处置列的文字可读宽度。 */
+@media (max-width: 1366px) and (min-width: 1181px) {
+  .app-main {
+    grid-template-columns: 216px minmax(360px, 1.1fr) minmax(250px, 0.7fr) minmax(270px, 0.8fr);
+    gap: 12px;
+  }
+
+  .app-main.is-triage-collapsed {
+    grid-template-columns: 44px minmax(360px, 1.1fr) minmax(250px, 0.7fr) minmax(270px, 0.8fr);
+  }
+}
+
+@media (max-width: 1180px) {
+  body {
+    overflow: auto;
+  }
+
+  .app-shell {
+    width: 100%;
+    min-width: 0;
+    min-height: 100%;
+    height: auto;
+  }
+
+  .timeline-shell {
+    height: auto;
+    min-height: 58px;
+    flex-wrap: wrap;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .runtime-bar {
+    align-items: center;
+  }
+
+  .app-main {
+    flex: none;
+    display: flex;
+    flex-direction: column;
+    overflow: visible;
+  }
+
+  .app-triage,
+  .app-map,
+  .app-narrative,
+  .app-plan {
+    width: 100%;
+    min-width: 0;
+    flex: none;
+  }
+
+  .app-triage {
+    height: 300px;
+  }
+
+  .app-main.is-triage-collapsed .app-triage {
+    height: 48px;
+  }
+
+  .app-map,
+  .app-narrative,
+  .app-plan {
+    height: min(620px, 78vh);
+    min-height: 480px;
+  }
+
+  .app-map-stack {
+    grid-template-rows: minmax(300px, 1.2fr) minmax(250px, 0.8fr);
+  }
+}

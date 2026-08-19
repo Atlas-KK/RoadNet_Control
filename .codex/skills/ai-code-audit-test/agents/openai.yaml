@@ -1,0 +1,7 @@
+﻿interface:
+  display_name: "AI Code Audit Test"
+  short_description: "四层审计 AI 生成代码、扫描风险并验证测试覆盖"
+  default_prompt: "Use $ai-code-audit-test to perform a four-layer audit of Codex-generated code, run relevant checks, and produce actionable modification advice."
+
+policy:
+  allow_implicit_invocation: true
