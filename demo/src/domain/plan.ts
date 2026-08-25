@@ -18,6 +18,20 @@ export interface PlanAiStatus {
 
 export type MeasureRunState = '待确认' | '已确认' | '已下发' | '自动执行' | '已完成';
 
+/** 接管事实不足以安全生成可执行措施时的显式缺口，不得用空参数Measure代替。 */
+export interface PlanningGap {
+  gapId: string;
+  controlEventId: string;
+  monitoringEventId: string;
+  handoffId: string;
+  idempotencyKey: string;
+  createdAt: string;
+  reason: string;
+  missingFacts: string[];
+  status: 'open';
+  simulation: boolean;
+}
+
 export type DispatchState = 'pending' | 'dispatching' | 'success' | 'partial_success' | 'failed';
 export type DispatchTargetType = 'system' | 'personnel' | 'device';
 

@@ -43,6 +43,12 @@ export interface RuntimeEventInput {
   wind?: { dir: 'forward' | 'reverse'; speed: number };
   /** 演示场景中由货单/现场检测确认的泄漏物密度属性。 */
   spillLighterThanAir?: boolean;
+  /** 仅供ControlBridge使用；人工应急直报不需要提供。 */
+  monitoringHandoff?: {
+    monitoringEventId: string;
+    handoffId: string;
+    idempotencyKey: string;
+  };
 }
 
 export interface IngestContext {
@@ -124,6 +130,9 @@ export function ingestReport(input: RuntimeEventInput, ctx: IngestContext): Inge
   if (best && best.decision.tier === 'auto') {
     const patch: Partial<SimEvent> = {
       mergedFrom: [...(best.ev.mergedFrom ?? []), input.sourceKind],
+      monitoringHandoffs: input.monitoringHandoff
+        ? [...(best.ev.monitoringHandoffs ?? []), input.monitoringHandoff]
+        : best.ev.monitoringHandoffs,
     };
     if (input.casualties != null && best.ev.casualties == null) patch.casualties = input.casualties;
     if (input.hazmat != null && best.ev.hazmat == null) patch.hazmat = input.hazmat;
@@ -165,6 +174,7 @@ export function ingestReport(input: RuntimeEventInput, ctx: IngestContext): Inge
     wind: input.wind,
     spillLighterThanAir: input.spillLighterThanAir,
     direction: input.direction,
+    monitoringHandoffs: input.monitoringHandoff ? [input.monitoringHandoff] : undefined,
   };
 
   // 隧道段与团雾邻域从静态路网/运行期环境现算，供危化品措施（全幅封道/通风）参数模板使用；

@@ -14,7 +14,10 @@ import type { EventProgressReport, SimEvent } from './domain/event';
 import type { ChartSpec } from './domain/chart';
 import type { MergeInfo } from './domain/merge';
 import type { TmsResult } from './domain/tms';
-import type { MeasureRunState, Plan, PlanMeasure } from './domain/plan';
+import type { MeasureRunState, Plan, PlanMeasure, PlanningGap } from './domain/plan';
+import type { ControlEventUpdate, HandoffRequest, HandoffResult, MonitoringEventUpdate } from './domain/handoff';
+import { MONITORING_TYPE_LABEL, MONITORING_TYPE_NODE, SUPPORTED_CONTROL_ROADS, prepareControlHandoff, sanitizeHandoffPlan } from './engine/controlHandoffIngress';
+import { crossModuleSyncBus } from './monitoring/services/crossModuleSync';
 import type { AuditEntry, AuditKind } from './domain/audit';
 import * as persistence from './services/persistence';
 import {
@@ -79,6 +82,7 @@ interface AppState {
   tracePlayback: TracePlayback;
   highlight: Highlight;
   plans: Plan[];
+  planningGaps: PlanningGap[];
   activePlanVersion: number;
   forcedInterrupt: string | null;
   mergeInfo: MergeInfo | null;
@@ -96,6 +100,10 @@ interface AppState {
   focusedEventId: string | null;
   /** 当前加载的案例孪生脚本；五个演示案例共用，不影响手工上报。 */
   activeDemoTwin?: ActiveDemoTwin;
+  crossModuleSyncCursor: number;
+  processedMonitoringUpdateIds: string[];
+  pendingMonitoringUpdatesBySequence: Record<number, MonitoringEventUpdate>;
+  controlSyncAttention?: string;
 
   play: () => void;
   pause: () => void;
@@ -117,7 +125,11 @@ interface AppState {
   confirmPlanCandidate: (planId: string, version: number) => void;
   confirmMeasure: (planId: string, version: number, measureId: string) => void;
   setForcedInterrupt: (measureId: string | null) => void;
-  ingestEvent: (input: RuntimeEventInput) => void;
+  ingestEvent: (input: RuntimeEventInput) => { controlEventId: string; disposition: 'created' | 'merged' };
+  acceptMonitoringHandoff: (request: HandoffRequest) => HandoffResult;
+  applyMonitoringEventUpdate: (update: MonitoringEventUpdate) => { status: 'applied' | 'duplicate' | 'gap' | 'rejected'; reason: string };
+  recoverCrossModuleSync: () => void;
+  decideControlEventLifecycle: (eventId: string, status: ControlEventUpdate['eventLifecycleStatus'], reason: string, decidedBy: string) => ControlEventUpdate;
   loadDemoCase: (demoCase: DemoCase) => void;
   setEnvironment: (env: EnvironmentState) => void;
   setMapTheme: (theme: MapTheme) => void;
@@ -191,6 +203,7 @@ function emptyRuntimeState(): Omit<AppState, 'persistenceAvailable' | 'audit' | 
     tracePlayback: EMPTY_TRACE_PLAYBACK,
     highlight: EMPTY_HL,
     plans: [],
+    planningGaps: [],
     activePlanVersion: 1,
     forcedInterrupt: null,
     mergeInfo: null,
@@ -205,6 +218,10 @@ function emptyRuntimeState(): Omit<AppState, 'persistenceAvailable' | 'audit' | 
     runtimeSeq: 0,
     focusedEventId: null,
     activeDemoTwin: undefined,
+    crossModuleSyncCursor: 0,
+    processedMonitoringUpdateIds: [],
+    pendingMonitoringUpdatesBySequence: {},
+    controlSyncAttention: undefined,
   };
 }
 
@@ -262,6 +279,10 @@ type RuntimeActions = Pick<AppState,
   | 'confirmMeasure'
   | 'setForcedInterrupt'
   | 'ingestEvent'
+  | 'acceptMonitoringHandoff'
+  | 'applyMonitoringEventUpdate'
+  | 'recoverCrossModuleSync'
+  | 'decideControlEventLifecycle'
   | 'loadDemoCase'
   | 'setEnvironment'
   | 'setMapTheme'
@@ -317,6 +338,7 @@ export const useStore = create<AppState>((set, get) => {
       sceneBaseSec: s.sceneBaseSec,
       events: s.events,
       plans: s.plans,
+      planningGaps: s.planningGaps,
       trace: s.trace,
       calcs: s.calcs,
       resourceOccupancy: s.resourceOccupancy,
@@ -325,6 +347,8 @@ export const useStore = create<AppState>((set, get) => {
       datasetRecords: [],
       timelineLog: s.timelineLog,
       activeDemoTwin: s.activeDemoTwin,
+      crossModuleSyncCursor: s.crossModuleSyncCursor,
+      processedMonitoringUpdateIds: s.processedMonitoringUpdateIds,
     });
   };
 
@@ -734,6 +758,7 @@ export const useStore = create<AppState>((set, get) => {
         sceneBaseSec: snap.sceneBaseSec,
         events: snap.events,
         plans: snap.plans,
+        planningGaps: snap.planningGaps ?? [],
         trace: snap.trace,
         calcs: snap.calcs,
         resourceOccupancy: snap.resourceOccupancy,
@@ -742,6 +767,8 @@ export const useStore = create<AppState>((set, get) => {
         timelineLog: snap.timelineLog,
         runtimeSeq: snap.events.filter((e) => e.id.startsWith('EV-R')).length,
         activeDemoTwin: snap.activeDemoTwin,
+        crossModuleSyncCursor: snap.crossModuleSyncCursor ?? 0,
+        processedMonitoringUpdateIds: snap.processedMonitoringUpdateIds ?? [],
       }
     : emptyRuntimeState();
 
@@ -1037,9 +1064,223 @@ export const useStore = create<AppState>((set, get) => {
         // 规则推理和交通流计算已完成，后台自动生成事件级综合研判。
         requestTraceAiExplanation(result.event, result.trace, result.calcs);
       }
+persistRuntime();
+      return {
+        controlEventId: result.kind === 'merged' ? result.targetId : result.event.id,
+        disposition: result.kind === 'merged' ? 'merged' : 'created',
+      };
+    },
+
+    acceptMonitoringHandoff: (request) => {
+      const existingEvent = get().events.find((event) => event.monitoringHandoffs?.some((link) => link.idempotencyKey === request.idempotencyKey));
+      const existingGap = get().planningGaps.find((gap) => gap.idempotencyKey === request.idempotencyKey);
+      const existingControlEventId = existingEvent?.id ?? existingGap?.controlEventId;
+      if (existingControlEventId) {
+        return {
+          messageId: `RESULT-${request.messageId}`, correlationId: request.correlationId, handoffId: request.handoffId,
+          status: 'duplicate', controlEventId: existingControlEventId, controlEventVersion: 1, retryable: false,
+        };
+      }
+      const acceptedAt = new Date().toISOString();
+      const prepared = prepareControlHandoff(request, acceptedAt);
+      if (prepared.kind === 'planning_gap') {
+        set((state) => ({ planningGaps: [...state.planningGaps, prepared.gap] }));
+        pushAudit('事件接入', `${request.monitoringEventId} 接管后形成规划缺口：${prepared.gap.missingFacts.join('、')}`, {
+          eventId: prepared.gap.controlEventId, payload: { handoffId: request.handoffId, idempotencyKey: request.idempotencyKey },
+        });
+        persistRuntime();
+        return {
+          messageId: `RESULT-${request.messageId}`, correlationId: request.correlationId, handoffId: request.handoffId,
+          status: 'accepted', controlEventId: prepared.gap.controlEventId, controlEventVersion: 1, acceptedAt, retryable: false,
+        };
+      }
+      const acceptance = get().ingestEvent(prepared.input);
+      set((state) => ({
+        events: state.events.map((event) => event.id === acceptance.controlEventId
+          ? { ...event, controlEventVersion: event.controlEventVersion ?? 1, controlLifecycleStatus: 'handling' as const }
+          : event),
+      }));
+      const removedMeasureIds: string[] = [];
+      set((state) => ({
+        plans: state.plans.map((plan) => {
+          if (plan.id !== `PLAN-${acceptance.controlEventId}`) return plan;
+          const sanitized = sanitizeHandoffPlan(plan);
+          removedMeasureIds.push(...sanitized.removedMeasureIds);
+          return sanitized.plan;
+        }),
+      }));
+      if (removedMeasureIds.length) {
+        const gap: PlanningGap = {
+          gapId: `GAP-${request.handoffId}-MEASURES`, controlEventId: acceptance.controlEventId,
+          monitoringEventId: request.monitoringEventId, handoffId: request.handoffId, idempotencyKey: `${request.idempotencyKey}:measures`,
+          createdAt: acceptedAt, reason: '空参数措施已从接管预案移除', missingFacts: removedMeasureIds, status: 'open', simulation: request.simulation,
+        };
+        set((state) => ({ planningGaps: [...state.planningGaps, gap] }));
+      }
+      pushAudit('事件接入', `${request.monitoringEventId} 已接管为 ${acceptance.controlEventId}，所有措施等待人工确认`, {
+        eventId: acceptance.controlEventId, payload: { handoffId: request.handoffId, idempotencyKey: request.idempotencyKey },
+      });
+      persistRuntime();
+      return {
+        messageId: `RESULT-${request.messageId}`, correlationId: request.correlationId, handoffId: request.handoffId,
+        status: 'accepted', controlEventId: acceptance.controlEventId, controlEventVersion: 1, acceptedAt, retryable: false,
+      };
+    },
+
+    applyMonitoringEventUpdate: (update) => {
+      const initial = get();
+      if (initial.processedMonitoringUpdateIds.includes(update.messageId)) {
+        return { status: 'duplicate' as const, reason: `消息${update.messageId}已处理` };
+      }
+      if (update.streamSequence > initial.crossModuleSyncCursor + 1) {
+        set((state) => ({
+          pendingMonitoringUpdatesBySequence: { ...state.pendingMonitoringUpdatesBySequence, [update.streamSequence]: update },
+          controlSyncAttention: `等待补拉游标${state.crossModuleSyncCursor + 1}至${update.streamSequence - 1}`,
+        }));
+        return { status: 'gap' as const, reason: `检测到跨模块消息缺口，当前游标${initial.crossModuleSyncCursor}` };
+      }
+      const event = initial.events.find((item) => item.id === update.controlEventId
+        && item.monitoringHandoffs?.some((link) => link.monitoringEventId === update.monitoringEventId && link.handoffId === update.correlationId));
+      const consume = (status: 'applied' | 'rejected', reason: string) => {
+        set((state) => ({
+          crossModuleSyncCursor: Math.max(state.crossModuleSyncCursor, update.streamSequence),
+          processedMonitoringUpdateIds: [...state.processedMonitoringUpdateIds, update.messageId].slice(-500),
+          pendingMonitoringUpdatesBySequence: Object.fromEntries(Object.entries(state.pendingMonitoringUpdatesBySequence)
+            .filter(([sequence]) => Number(sequence) !== update.streamSequence)),
+          controlSyncAttention: status === 'rejected' ? reason : undefined,
+        }));
+        pushAudit(status === 'applied' ? '人工续报' : '事件接入', `跨模块消息${update.messageId}${status === 'applied' ? '已应用' : '被拒绝'}：${reason}`, {
+          eventId: update.controlEventId,
+          payload: { messageId: update.messageId, streamSequence: update.streamSequence, monitoringEventVersion: update.monitoringEventVersion },
+        });
+        persistRuntime();
+        const next = get().pendingMonitoringUpdatesBySequence[get().crossModuleSyncCursor + 1];
+        if (next) get().applyMonitoringEventUpdate(next);
+        return { status, reason };
+      };
+      if (!event) return consume('rejected', '管控事件、监测事件或接管关联不匹配');
+      const currentVersion = event.controlEventVersion ?? 1;
+      if (update.expectedControlEventVersion !== undefined && update.expectedControlEventVersion !== currentVersion) {
+        return consume('rejected', `管控事件版本冲突：期望${update.expectedControlEventVersion}，当前${currentVersion}`);
+      }
+
+      const facts = update.changedFacts;
+      const changes: EventProgressReport['changes'] = {};
+      if (facts?.casualties !== undefined) changes.casualties = facts.casualties;
+      if (facts?.hazardousMaterials !== undefined || facts?.hazardousMaterialLeak !== undefined) {
+        changes.hazmat = Boolean(facts.hazardousMaterials) || Boolean(facts.hazardousMaterialLeak);
+      }
+      if (facts?.lanesAffected !== undefined) changes.lanesClosed = facts.lanesAffected;
+      if (facts?.lanesTotal !== undefined) changes.lanesTotal = facts.lanesTotal;
+      if (facts?.vehicleCount !== undefined) changes.vehicles = facts.vehicleCount;
+      if (facts?.location?.kilometer !== undefined) changes.accidentKp = facts.location.kilometer;
+      if (facts?.location?.direction !== undefined) changes.direction = facts.location.direction;
+      if (facts?.location?.roadCode && SUPPORTED_CONTROL_ROADS.has(facts.location.roadCode as SimEvent['road'])) {
+        changes.road = facts.location.roadCode as SimEvent['road'];
+      }
+      if (facts?.eventType) {
+        changes.typeNodeId = MONITORING_TYPE_NODE[facts.eventType];
+        changes.label = MONITORING_TYPE_LABEL[facts.eventType];
+      }
+      if (update.updateType === 'facts_corrected' || update.updateType === 'evidence_added') {
+        get().submitProgressReport(event.id, {
+          reporter: '事件监测模块', source: '跨模块事件更新', description: update.reason,
+          kind: update.updateType === 'facts_corrected' ? '订正续报' : '续报',
+          changes: update.updateType === 'facts_corrected' ? changes : {},
+        });
+      }
+
+      const afterReport = get().events.find((item) => item.id === event.id) ?? event;
+      const evidenceById = new Map((afterReport.monitoringEvidence ?? []).map((item) => [item.evidenceId, item]));
+      for (const item of update.evidence ?? []) evidenceById.set(item.evidenceId, item);
+      const nextVersion = currentVersion + 1;
+      const lifecycleStatus = update.updateType === 'false_positive_review_requested'
+        ? 'correction_required' as const
+        : afterReport.controlLifecycleStatus ?? 'handling' as const;
+      set((state) => ({
+        events: state.events.map((item) => item.id === event.id ? {
+          ...item,
+          monitoringEvidence: [...evidenceById.values()],
+          controlEventVersion: nextVersion,
+          controlLifecycleStatus: lifecycleStatus,
+          processedMonitoringMessageIds: [...(item.processedMonitoringMessageIds ?? []), update.messageId].slice(-100),
+        } : item),
+      }));
+      const latestPlan = get().plans.filter((plan) => plan.id === `PLAN-${event.id}`).sort((a, b) => b.version - a.version)[0];
+      const occurredAt = new Date().toISOString();
+      const response: ControlEventUpdate = {
+        messageId: `MSG-C-${event.id}-V${nextVersion}`, correlationId: update.correlationId,
+        streamSequence: crossModuleSyncBus.nextSequence(), controlEventId: event.id, handoffId: update.correlationId,
+        controlEventVersion: nextVersion, occurredAt,
+        eventLifecycleStatus: lifecycleStatus, controlPhase: lifecycleStatus === 'correction_required' ? 'review' : 'reasoning',
+        planVersion: latestPlan?.version, planState: latestPlan?.state,
+        pendingMeasureCount: latestPlan?.measures.filter((measure) => measure.runState === '待确认').length,
+        executionProgress: update.updateType === 'facts_corrected' && Object.keys(changes).length > 0
+          ? `事实订正已触发V${latestPlan?.version ?? '-'}重新研判`
+          : update.updateType === 'evidence_added' ? '证据已追加，未触发重新研判' : '等待事件级人工复核',
+        simulation: update.simulation,
+      };
+      crossModuleSyncBus.publishControl(response);
+      return consume('applied', update.updateType === 'facts_corrected' && Object.keys(changes).length > 0 ? '关键事实已订正并重新研判' : '更新已留痕，未直接改变事件终态');
+    },
+
+    recoverCrossModuleSync: () => {
+      let progressed = true;
+      while (progressed) {
+        progressed = false;
+        for (const envelope of crossModuleSyncBus.pullAfter(get().crossModuleSyncCursor)) {
+          const before = get().crossModuleSyncCursor;
+          if (envelope.direction === 'monitoring_to_control') get().applyMonitoringEventUpdate(envelope.message);
+          else if (envelope.message.streamSequence === before + 1) set({ crossModuleSyncCursor: envelope.message.streamSequence });
+          if (get().crossModuleSyncCursor > before) progressed = true;
+          if (get().crossModuleSyncCursor < envelope.message.streamSequence) break;
+        }
+      }
+      if (Object.keys(get().pendingMonitoringUpdatesBySequence).length === 0) set({ controlSyncAttention: undefined });
       persistRuntime();
     },
 
+    decideControlEventLifecycle: (eventId, status, reasonInput, decidedByInput) => {
+      get().recoverCrossModuleSync();
+      const event = get().events.find((item) => item.id === eventId);
+      if (!event) throw new Error(`管控事件不存在：${eventId}`);
+      const handoff = event.monitoringHandoffs?.[0];
+      if (!handoff) throw new Error('只有来源于事件监测接管的事件可以回写监测模块');
+      const reason = reasonInput.trim();
+      const decidedBy = decidedByInput.trim();
+      if (!reason || !decidedBy) throw new Error('事件级状态决定必须填写决定人和原因');
+      const terminal = status === 'resolved' || status === 'closed' || status === 'false_positive_confirmed';
+      const occurredAt = new Date().toISOString();
+      const nextVersion = (event.controlEventVersion ?? 1) + 1;
+      const closureDecision = terminal ? {
+        decisionId: `DEC-${eventId}-V${nextVersion}`, decidedAt: occurredAt, decidedBy, reason,
+      } : undefined;
+      const latestPlan = get().plans.filter((plan) => plan.id === `PLAN-${eventId}`).sort((a, b) => b.version - a.version)[0];
+      const update: ControlEventUpdate = {
+        messageId: `MSG-C-${eventId}-V${nextVersion}`, correlationId: handoff.handoffId,
+        streamSequence: crossModuleSyncBus.nextSequence(), controlEventId: eventId, handoffId: handoff.handoffId,
+        controlEventVersion: nextVersion, occurredAt, eventLifecycleStatus: status,
+        controlPhase: status === 'closed' || status === 'false_positive_confirmed' ? 'closed' : status === 'resolved' ? 'closing' : 'review',
+        planVersion: latestPlan?.version, planState: latestPlan?.state,
+        pendingMeasureCount: latestPlan?.measures.filter((measure) => measure.runState === '待确认').length,
+        executionProgress: reason, closureDecision, simulation: true,
+      };
+      set((state) => ({
+        events: state.events.map((item) => item.id === eventId ? {
+          ...item,
+          controlEventVersion: nextVersion,
+          controlLifecycleStatus: status,
+          finalized: terminal ? true : item.finalized,
+          falsePositive: status === 'false_positive_confirmed' ? true : item.falsePositive,
+        } : item),
+        crossModuleSyncCursor: update.streamSequence,
+      }));
+      pushAudit(status === 'false_positive_confirmed' ? '事件证伪' : terminal ? '事件处置闭环' : '续报订正',
+        `事件级状态决定：${eventId} → ${status}；${reason}`, { eventId, payload: { closureDecision, messageId: update.messageId } });
+      crossModuleSyncBus.publishControl(update);
+      persistRuntime();
+      return update;
+    },
     loadDemoCase: (demoCase) => {
       // 案例加载是演示入口：先清空旧运行库，再按脚本顺序走统一事件接入管道。
       get().clearRuntime();
@@ -1404,6 +1645,10 @@ export const useStore = create<AppState>((set, get) => {
     requestTraceExplanation: requestTraceAiExplanationByEvent,
     requestTwinNarrative: requestTwinAiNarrative,
   };
+});
+
+crossModuleSyncBus.subscribeMonitoring(() => {
+  useStore.getState().recoverCrossModuleSync();
 });
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {

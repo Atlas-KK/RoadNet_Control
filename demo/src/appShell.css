@@ -1,0 +1,97 @@
+/* FR-EM-001 AppShell及一、二级模块导航。 */
+.app-module-tabs,
+.monitoring-view-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--color-panel-2);
+}
+
+.app-module-tab,
+.monitoring-view-tab {
+  min-height: 32px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0 16px;
+  color: var(--color-ink-soft);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.app-module-tab:hover,
+.monitoring-view-tab:hover {
+  color: var(--color-brand-700);
+  background: var(--color-brand-50);
+}
+
+.app-module-tab[aria-selected='true'],
+.monitoring-view-tab[aria-selected='true'] {
+  border-color: var(--color-brand-100);
+  background: var(--color-panel);
+  color: var(--color-brand-700);
+  box-shadow: 0 1px 3px rgb(29 33 41 / 8%);
+}
+
+.event-monitoring-workspace {
+  overflow: hidden;
+}
+
+.monitoring-view-tabs {
+  width: fit-content;
+  flex: 0 0 auto;
+}
+
+.monitoring-view-placeholder {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+}
+
+.monitoring-placeholder-mark {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  border: 1px solid var(--color-brand-100);
+  border-radius: 12px;
+  background: var(--color-brand-50);
+  color: var(--color-brand-700);
+  font-size: 24px;
+}
+
+.monitoring-view-placeholder h1 {
+  margin: 16px 0 4px;
+  color: var(--color-ink);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.monitoring-view-placeholder p {
+  max-width: 560px;
+  margin: 0 0 16px;
+  color: var(--color-ink-soft);
+  font-size: 13px;
+}
+
+@media (max-width: 1180px) {
+  .app-header {
+    align-items: center;
+  }
+
+  .app-module-actions {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .event-monitoring-workspace {
+    min-height: 560px;
+    overflow: visible;
+  }
+}

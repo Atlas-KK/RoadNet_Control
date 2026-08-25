@@ -144,7 +144,7 @@ function PlanTimelineItem({ plan, index, versions, activeVersion, onVersionChang
 }
 
 function ProgressReportTimelineItem({ report, index }: { report: EventProgressReport; index: number }) {
-  const changeLabels: Record<keyof EventProgressReport['changes'], string> = { casualties: '伤亡', hazmat: '危化品', lanesClosed: '占道车道', q: '交通量', stage: '处置进展' };
+  const changeLabels: Partial<Record<keyof EventProgressReport['changes'], string>> = { casualties: '伤亡', hazmat: '危化品', lanesClosed: '占道车道', q: '交通量', stage: '处置进展' };
   const changed = Object.keys(report.changes).map((key) => changeLabels[key as keyof EventProgressReport['changes']]);
   return (
     <li className="relative flex gap-2.5 pb-2.5" data-testid="event-progress-report">

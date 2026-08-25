@@ -2,6 +2,7 @@ import type { RoadId } from '../data/network';
 import type { Severity } from '../engine/severity';
 import type { TraceAiStatus, TraceComprehensiveConclusion } from '../engine/trace';
 import type { TravelDirection } from '../engine/merge';
+import type { EvidenceSummary } from './monitoring';
 
 export interface EventAiStatus {
   status: 'idle' | 'pending' | 'ok' | 'rejected' | 'unavailable';
@@ -93,8 +94,15 @@ export interface EventProgressReport {
     casualties?: number;
     hazmat?: boolean;
     lanesClosed?: number;
+    lanesTotal?: number;
     q?: number;
     stage?: string;
+    road?: RoadId;
+    accidentKp?: number;
+    direction?: TravelDirection;
+    typeNodeId?: string;
+    label?: string;
+    vehicles?: number;
   };
   /** 该续报导致重新研判时，关联新生成的管控预案版本。 */
   triggeredPlanVersion?: number;
@@ -171,4 +179,18 @@ export interface SimEvent {
   /** 规则推理与交通流计算完成后由后台生成的一条事件级综合结论。 */
   aiTraceConclusion?: TraceComprehensiveConclusion;
   aiTraceStatus?: TraceAiStatus;
+  /** 事件监测接管关联；允许多个监测事件在管控侧归并为同一事件。 */
+  monitoringHandoffs?: Array<{
+    monitoringEventId: string;
+    handoffId: string;
+    idempotencyKey: string;
+  }>;
+  /** 管控事件实体版本，供跨模块乐观并发与乱序仲裁。 */
+  controlEventVersion?: number;
+  /** 管控事件级生命周期；不得由预案状态直接推导。 */
+  controlLifecycleStatus?: 'handling' | 'resolved' | 'closed' | 'correction_required' | 'false_positive_confirmed';
+  /** 监测侧补充的证据摘要，只追加不覆盖。 */
+  monitoringEvidence?: EvidenceSummary[];
+  /** 已处理监测更新消息，跨刷新用于消息幂等。 */
+  processedMonitoringMessageIds?: string[];
 }

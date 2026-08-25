@@ -1,0 +1,113 @@
+.monitoring-verification-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(330px, .65fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.verification-console {
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.verification-console-header,
+.verification-console-header > div,
+.verification-claim-actions > div,
+.verification-submit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.verification-console-header {
+  justify-content: space-between;
+}
+
+.verification-console-header > div {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+
+.verification-console-header span,
+.verification-permission-hint {
+  color: var(--color-text-3);
+  font-size: 12px;
+}
+
+.verification-countdown {
+  color: var(--color-warning-6) !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.verification-countdown.is-overdue {
+  color: var(--color-danger-6) !important;
+}
+
+.verification-claim-actions p {
+  color: var(--color-text-2);
+  margin: 0 0 10px;
+  line-height: 1.6;
+}
+
+.verification-form,
+.verification-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.verification-form {
+  gap: 11px;
+}
+
+.verification-form label {
+  color: var(--color-text-2);
+  font-size: 12px;
+}
+
+.verification-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.verification-form input,
+.verification-form select,
+.verification-form textarea {
+  width: 100%;
+  border: 1px solid var(--color-border-2);
+  border-radius: 5px;
+  background: var(--color-bg-2);
+  color: var(--color-text-1);
+  padding: 7px 9px;
+  font: inherit;
+}
+
+.verification-form textarea {
+  min-height: 58px;
+  resize: vertical;
+}
+
+.verification-checkbox {
+  flex-direction: row !important;
+  align-items: center;
+}
+
+.verification-checkbox input {
+  width: auto;
+}
+
+.verification-submit-actions {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1200px) {
+  .monitoring-verification-layout {
+    grid-template-columns: 1fr;
+  }
+}

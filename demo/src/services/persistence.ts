@@ -10,7 +10,7 @@
 
 import type { AuditEntry } from '../domain/audit';
 import type { SimEvent } from '../domain/event';
-import type { Plan } from '../domain/plan';
+import type { Plan, PlanningGap } from '../domain/plan';
 import type { CalcRecord, TraceStep } from '../engine/trace';
 import type { DatasetRecord } from '../domain/dataset';
 import type { EnvironmentState } from '../engine/conditions';
@@ -30,6 +30,7 @@ export interface RuntimeSnapshot {
   sceneBaseSec: number;
   events: SimEvent[];
   plans: Plan[];
+  planningGaps?: PlanningGap[];
   trace: TraceStep[];
   calcs: CalcRecord[];
   resourceOccupancy: Record<string, string>;
@@ -38,6 +39,8 @@ export interface RuntimeSnapshot {
   datasetRecords: DatasetRecord[];
   timelineLog: { clock: string; text: string }[];
   activeDemoTwin?: ActiveDemoTwin;
+  crossModuleSyncCursor?: number;
+  processedMonitoringUpdateIds?: string[];
 }
 
 // ---- 存储后端：localStorage，失败回退内存（保证永不抛错）----
@@ -123,6 +126,7 @@ export function isRuntimeSnapshot(value: unknown): value is RuntimeSnapshot {
   if (
     !Array.isArray(value.events)
     || !Array.isArray(value.plans)
+    || (value.planningGaps !== undefined && !Array.isArray(value.planningGaps))
     || !Array.isArray(value.trace)
     || !Array.isArray(value.calcs)
     || !Array.isArray(value.datasetRecords)
