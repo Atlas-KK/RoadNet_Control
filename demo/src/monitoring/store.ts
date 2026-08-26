@@ -10,6 +10,8 @@ import type {
   MonitoringEvent,
   VerificationTask,
 } from '../domain/monitoring';
+import { isActiveMonitoringLifecycle } from '../domain/monitoring';
+import type { MonitoringMessage } from './adapters/monitoringSourceAdapter';
 import {
   transitionVerification,
   type VerificationCommand,
@@ -34,10 +36,13 @@ import {
   type MonitoringDependencyHealth,
 } from './engine/degradation';
 import { crossModuleSyncBus } from './services/crossModuleSync';
-import {
+import { scoreAggregationCandidate } from './engine/aggregation';
+import { EMPTY_IDEMPOTENCY_INDEX, normalizeSourceAlarmDelivery, type NormalizationFailureRecord } from './engine/normalize';
+import { monitoringEventIdForCorrelation, projectSourceAlarmToMonitoringEvent } from './engine/sourceIngestion';import {
   SIMULATED_USERS,
   assertMonitoringPermission,
   findSimulatedUser,
+  MonitoringPermissionError,
   type MonitoringPermission,
   type SimulatedUser,
 } from './permissions';
@@ -50,8 +55,13 @@ export interface SyncApplyResult {
   reason: string;
 }
 
-export interface MonitoringUpdateInput {
-  updateType: MonitoringEventUpdate['updateType'];
+export interface MonitoringMessageIngestionResult {
+  status: 'created' | 'merged' | 'duplicate' | 'invalid' | 'cleared' | 'evidence_recorded' | 'ignored';
+  eventId?: string;
+  message: string;
+}
+
+export interface MonitoringUpdateInput {  updateType: MonitoringEventUpdate['updateType'];
   changedFacts?: MonitoringEventUpdate['changedFacts'];
   evidence?: MonitoringEventUpdate['evidence'];
   reason: string;
@@ -68,6 +78,7 @@ export interface MonitoringState {
   pendingControlUpdatesBySequence: Record<number, ControlEventUpdate>;
   alarmAssessments: AlarmAssessment[];
   monitoringAuditEntries: MonitoringAuditEntry[];
+  normalizationFailures: NormalizationFailureRecord[];
   connectionState: MonitoringConnectionState;
   streamCursor: number;
   syncCursor: number;
@@ -86,6 +97,8 @@ export interface MonitoringState {
   restoreDependency: (dependency: MonitoringDependency) => Promise<void>;
   restoreAllDependencies: () => Promise<void>;
   setStreamCursor: (cursor: number) => void;
+  ingestMonitoringMessage: (message: MonitoringMessage) => Promise<MonitoringMessageIngestionResult>;
+  resetMonitoringDemoData: () => Promise<void>;
   assertCurrentUserPermission: (permission: MonitoringPermission, eventId?: string) => void;
   applyVerificationCommand: (command: VerificationCommand) => Promise<VerificationTransitionOutput>;
   requestMonitoringHandoff: (eventId: string) => Promise<HandoffResult>;
@@ -143,11 +156,14 @@ function commandPermission(command: VerificationCommand): MonitoringPermission {
 function normalizeAndAuthorizeApproval(
   command: VerificationCommand,
   event: MonitoringEvent,
+  actor: SimulatedUser,
   nowMs: number,
 ): VerificationCommand {
   if (!('supervisorApproval' in command) || !command.supervisorApproval) return command;
   const approver = findSimulatedUser(command.supervisorApproval.approvedBy);
   if (!approver) throw new Error(`未知班长审批人：${command.supervisorApproval.approvedBy}`);
+  // 模拟身份环境也必须由当前班长本人执行受限操作，不能信任表单提交的他人ID。
+  if (approver.userId !== actor.userId) throw new MonitoringPermissionError(actor.userId, command.supervisorApproval.permission);
   assertMonitoringPermission(approver, command.supervisorApproval.permission, event);
   return {
     ...command,
@@ -178,6 +194,7 @@ export function createMonitoringStore(
     persistenceState: 'idle',
     dependencyHealth: DEFAULT_MONITORING_DEPENDENCY_HEALTH,
     currentUserId: SIMULATED_USERS[0].userId,
+    normalizationFailures: [],
 
     initialize: async () => {
       if (get().persistenceState === 'ready' || get().persistenceState === 'memory_only') return;
@@ -251,8 +268,222 @@ export function createMonitoringStore(
       set({ streamCursor });
     },
 
-    assertCurrentUserPermission: (permission, eventId) => {
+    ingestMonitoringMessage: async (message) => {
+      await get().initialize();
       const state = get();
+      const receivedAt = new Date(operationalClock.nowMs()).toISOString();
+      const setCursor = () => set((current) => ({ streamCursor: Math.max(current.streamCursor, message.streamSequence) }));
+
+      const existingReceipt = await repository.getReceiptByMessageId(message.messageId);
+      if (existingReceipt) {
+        setCursor();
+        return { status: 'duplicate', eventId: existingReceipt.alarmId, message: '消息已按messageId处理，未重复写入' };
+      }
+
+      const eventForCorrelation = () => {
+        const deterministicId = monitoringEventIdForCorrelation(message.correlationId);
+        const direct = get().monitoringEventsById[deterministicId];
+        if (direct) return direct;
+        const audit = [...get().monitoringAuditEntries].reverse().find((entry) => entry.payload?.correlationId === message.correlationId);
+        return audit ? get().monitoringEventsById[audit.entityId] : undefined;
+      };
+
+      if (message.kind === 'source_alarm') {
+        const sourceAlarmIndex = Object.fromEntries(Object.values(state.alarmsById).map((alarm) => [
+          JSON.stringify([alarm.sourceSystem, alarm.sourceAlarmId]), alarm.alarmId,
+        ]));
+        const normalized = normalizeSourceAlarmDelivery(message, {
+          ...EMPTY_IDEMPOTENCY_INDEX,
+          alarmIdBySourceKey: sourceAlarmIndex,
+        }, { receivedAt });
+        if (normalized.failure) {
+          const audit: MonitoringAuditEntry = {
+            entityId: normalized.failure.failureId, entityType: 'alarm', occurredAt: receivedAt,
+            kind: 'source_alarm_invalid', summary: normalized.failure.errors.map((error) => error.message).join('；'),
+            payload: { messageId: message.messageId, correlationId: message.correlationId }, simulation: message.simulation,
+          };
+          const persisted = normalized.receipt
+            ? await repository.commitSourceAlarmIngestion({ receipt: normalized.receipt, auditEntries: [audit] })
+            : [await repository.appendAudit(audit)];
+          set((current) => ({
+            normalizationFailures: [...current.normalizationFailures, normalized.failure!],
+            monitoringAuditEntries: [...current.monitoringAuditEntries, ...persisted],
+            streamCursor: Math.max(current.streamCursor, message.streamSequence),
+          }));
+          return { status: 'invalid', message: audit.summary };
+        }
+        if (!normalized.receipt) throw new Error('标准化未生成投递回执');
+        if (!normalized.alarm) {
+          const audit: MonitoringAuditEntry = {
+            entityId: normalized.receipt.alarmId ?? message.correlationId, entityType: 'alarm', occurredAt: receivedAt,
+            kind: 'source_alarm_duplicate', summary: '重复来源告警仅追加投递回执，不创建第二个Alarm',
+            payload: { messageId: message.messageId, correlationId: message.correlationId, duplicateBy: normalized.duplicateBy },
+            simulation: message.simulation,
+          };
+          const persisted = await repository.commitSourceAlarmIngestion({ receipt: normalized.receipt, auditEntries: [audit] });
+          set((current) => ({ monitoringAuditEntries: [...current.monitoringAuditEntries, ...persisted], streamCursor: Math.max(current.streamCursor, message.streamSequence) }));
+          return { status: 'duplicate', eventId: normalized.receipt.alarmId, message: audit.summary };
+        }
+
+        let existingEvent = eventForCorrelation();
+        let aggregation = existingEvent ? (() => {
+          const anchor = state.alarmsById[existingEvent!.alarmIds.at(-1) ?? ''];
+          return anchor ? scoreAggregationCandidate({ alarm: anchor }, { alarm: normalized.alarm!, facts: message.payload.observedFacts }) : undefined;
+        })() : undefined;
+        if (!existingEvent) {
+          let best: { event: MonitoringEvent; score: ReturnType<typeof scoreAggregationCandidate> } | undefined;
+          for (const candidateEvent of Object.values(state.monitoringEventsById).filter((event) => isActiveMonitoringLifecycle(event.lifecycleStatus))) {
+            const anchor = state.alarmsById[candidateEvent.alarmIds.at(-1) ?? ''];
+            if (!anchor) continue;
+            const score = scoreAggregationCandidate({ alarm: anchor }, { alarm: normalized.alarm, facts: message.payload.observedFacts });
+            if (score.tier === 'auto_merge' && (!best || score.totalScore > best.score.totalScore)) best = { event: candidateEvent, score };
+          }
+          existingEvent = best?.event;
+          aggregation = best?.score;
+        }
+        const finalizedCorrelationEvent = existingEvent && !isActiveMonitoringLifecycle(existingEvent.lifecycleStatus);
+        if (finalizedCorrelationEvent) existingEvent = undefined;
+        const nextEvent = projectSourceAlarmToMonitoringEvent({
+          correlationId: message.correlationId,
+          eventIdSuffix: finalizedCorrelationEvent ? `S${message.streamSequence}` : undefined,
+          alarm: normalized.alarm,
+          observedFacts: message.payload.observedFacts,
+          occurredAt: message.emittedAt,
+          existingEvent,
+          conflicts: aggregation?.factConflicts,
+        });
+        const audit: MonitoringAuditEntry = {
+          entityId: nextEvent.monitoringEventId, entityType: 'event', occurredAt: receivedAt,
+          kind: existingEvent ? 'source_alarm_merged' : 'source_alarm_created',
+          summary: existingEvent ? `告警已聚合至事件，当前关联${nextEvent.alarmIds.length}条Alarm` : '来源告警已生成待核实监测事件',
+          payload: {
+            messageId: message.messageId, correlationId: message.correlationId, sourceAlarmId: message.payload.sourceAlarmId,
+            observedFacts: message.payload.observedFacts, aggregationTier: aggregation?.tier, aggregationScore: aggregation?.totalScore,
+          },
+          simulation: message.simulation,
+        };
+        const persisted = await repository.commitSourceAlarmIngestion({
+          alarm: normalized.alarm, receipt: normalized.receipt, event: nextEvent,
+          expectedEventVersion: existingEvent?.version, auditEntries: [audit],
+        });
+        set((current) => ({
+          alarmsById: { ...current.alarmsById, [normalized.alarm!.alarmId]: normalized.alarm! },
+          monitoringEventsById: { ...current.monitoringEventsById, [nextEvent.monitoringEventId]: nextEvent },
+          activeEventIds: [nextEvent.monitoringEventId, ...current.activeEventIds.filter((id) => id !== nextEvent.monitoringEventId)],
+          monitoringAuditEntries: [...current.monitoringAuditEntries, ...persisted],
+          streamCursor: Math.max(current.streamCursor, message.streamSequence),
+        }));
+
+        if (existingEvent?.verificationMode === 'observation') {
+          const current = get();
+          const observedEvent = current.monitoringEventsById[nextEvent.monitoringEventId];
+          if (observedEvent) {
+            const output = transitionVerification({
+              event: observedEvent,
+              task: verificationTaskForEvent(current.verificationTasksById, observedEvent.monitoringEventId),
+              command: { type: 'evidence_added', eventId: observedEvent.monitoringEventId, expectedVersion: observedEvent.version, evidenceId: normalized.alarm.evidenceIds[0] ?? normalized.alarm.alarmId },
+              actorId: 'SYSTEM-DEMO-SOURCE', nowMs: operationalClock.nowMs(), idSeed: `${observedEvent.monitoringEventId}-${observedEvent.version + 1}`,
+            });
+            const reviewAudit = await repository.commitVerificationTransition({
+              expectedEventVersion: observedEvent.version, event: output.event, task: output.task,
+              assessments: output.assessments, auditEntries: output.auditEntries,
+            });
+            set((currentState) => ({
+              monitoringEventsById: { ...currentState.monitoringEventsById, [output.event.monitoringEventId]: output.event },
+              verificationTasksById: { ...currentState.verificationTasksById, [output.task.taskId]: output.task },
+              activeEventIds: [output.event.monitoringEventId, ...currentState.activeEventIds.filter((id) => id !== output.event.monitoringEventId)],
+              monitoringAuditEntries: [...currentState.monitoringAuditEntries, ...reviewAudit],
+            }));
+          }
+        }
+        return { status: existingEvent ? 'merged' : 'created', eventId: nextEvent.monitoringEventId, message: audit.summary };
+      }
+
+      const correlatedEvent = eventForCorrelation();
+      if (message.kind === 'source_clear') {
+        if (!correlatedEvent) {
+          const audit = await repository.appendAudit({
+            entityId: message.correlationId, entityType: 'event', occurredAt: receivedAt, kind: 'source_clear_unmatched',
+            summary: '收到解除消息，但未找到关联监测事件', payload: { correlationId: message.correlationId }, simulation: message.simulation,
+          });
+          set((current) => ({ monitoringAuditEntries: [...current.monitoringAuditEntries, audit], streamCursor: Math.max(current.streamCursor, message.streamSequence) }));
+          return { status: 'ignored', message: audit.summary };
+        }
+        if (['pending_handoff', 'handoff_in_progress', 'taken_over', 'handoff_failed'].includes(correlatedEvent.lifecycleStatus)) {
+          const audit = await repository.appendAudit({
+            entityId: correlatedEvent.monitoringEventId, entityType: 'event', occurredAt: receivedAt, kind: 'source_clear_observed_after_handoff',
+            summary: '来源解除信息已记录；已进入接管链路的事件仍等待事件级closureDecision',
+            payload: { correlationId: message.correlationId, reason: message.payload.reason }, simulation: message.simulation,
+          });
+          set((current) => ({ monitoringAuditEntries: [...current.monitoringAuditEntries, audit], streamCursor: Math.max(current.streamCursor, message.streamSequence) }));
+          return { status: 'evidence_recorded', eventId: correlatedEvent.monitoringEventId, message: audit.summary };
+        }
+        const nextEvent: MonitoringEvent = {
+          ...correlatedEvent, version: correlatedEvent.version + 1, lifecycleStatus: 'closed',
+          resolvedAt: message.payload.clearedAt, closedAt: message.payload.clearedAt, updatedAt: message.payload.clearedAt,
+        };
+        await repository.putEvent(nextEvent, correlatedEvent.version);
+        const audit = await repository.appendAudit({
+          entityId: correlatedEvent.monitoringEventId, entityType: 'event', occurredAt: receivedAt, kind: 'source_clear_closed',
+          summary: `来源确认异常解除并关闭监测事件：${message.payload.reason}`,
+          payload: { correlationId: message.correlationId, reason: message.payload.reason }, simulation: message.simulation,
+        });
+        set((current) => ({
+          monitoringEventsById: { ...current.monitoringEventsById, [nextEvent.monitoringEventId]: nextEvent },
+          activeEventIds: current.activeEventIds.filter((id) => id !== nextEvent.monitoringEventId),
+          monitoringAuditEntries: [...current.monitoringAuditEntries, audit], streamCursor: Math.max(current.streamCursor, message.streamSequence),
+        }));
+        return { status: 'cleared', eventId: nextEvent.monitoringEventId, message: audit.summary };
+      }
+
+      if (message.payload.evidenceId.includes('-VIDEO')) {
+        if (message.payload.status === 'unavailable' && get().dependencyHealth.video.availability !== 'degraded') {
+          await get().degradeDependency('video', '模拟视频服务不可用，已保留关键帧和文字证据');
+        }
+        if (message.payload.status === 'available' && get().dependencyHealth.video.availability === 'degraded') {
+          await get().restoreDependency('video');
+        }
+      }
+      if (correlatedEvent?.verificationMode === 'observation') {
+        const current = get();
+        const latest = current.monitoringEventsById[correlatedEvent.monitoringEventId];
+        if (latest) {
+          const output = transitionVerification({
+            event: latest, task: verificationTaskForEvent(current.verificationTasksById, latest.monitoringEventId),
+            command: { type: 'evidence_added', eventId: latest.monitoringEventId, expectedVersion: latest.version, evidenceId: message.payload.evidenceId },
+            actorId: 'SYSTEM-DEMO-SOURCE', nowMs: operationalClock.nowMs(), idSeed: `${latest.monitoringEventId}-${latest.version + 1}`,
+          });
+          const persisted = await repository.commitVerificationTransition({
+            expectedEventVersion: latest.version, event: output.event, task: output.task,
+            assessments: output.assessments, auditEntries: output.auditEntries,
+          });
+          set((currentState) => ({
+            monitoringEventsById: { ...currentState.monitoringEventsById, [output.event.monitoringEventId]: output.event },
+            verificationTasksById: { ...currentState.verificationTasksById, [output.task.taskId]: output.task },
+            activeEventIds: [output.event.monitoringEventId, ...currentState.activeEventIds.filter((id) => id !== output.event.monitoringEventId)],
+            monitoringAuditEntries: [...currentState.monitoringAuditEntries, ...persisted], streamCursor: Math.max(currentState.streamCursor, message.streamSequence),
+          }));
+          return { status: 'evidence_recorded', eventId: latest.monitoringEventId, message: '新证据已触发提前复核' };
+        }
+      }
+      const audit = await repository.appendAudit({
+        entityId: correlatedEvent?.monitoringEventId ?? message.correlationId, entityType: 'event', occurredAt: receivedAt,
+        kind: 'evidence_status_recorded', summary: message.payload.status === 'available' ? '证据状态更新为可用' : '证据不可用，启用关键帧和文字降级',
+        payload: { correlationId: message.correlationId, evidenceId: message.payload.evidenceId, status: message.payload.status }, simulation: message.simulation,
+      });
+      set((current) => ({ monitoringAuditEntries: [...current.monitoringAuditEntries, audit], streamCursor: Math.max(current.streamCursor, message.streamSequence) }));
+      return { status: 'evidence_recorded', eventId: correlatedEvent?.monitoringEventId, message: audit.summary };
+    },
+
+    resetMonitoringDemoData: async () => {
+      await repository.clearMonitoringDemoData();
+      set({
+        ...projectionState(emptyProjection()), normalizationFailures: [], streamCursor: 0, syncCursor: 0,
+        pendingControlUpdatesBySequence: {}, syncAttention: undefined, handoffNotice: undefined,
+      });
+    },
+
+    assertCurrentUserPermission: (permission, eventId) => {      const state = get();
       const user = findSimulatedUser(state.currentUserId);
       if (!user) throw new Error(`未知模拟用户：${state.currentUserId}`);
       const event = eventId ? state.monitoringEventsById[eventId] : undefined;
@@ -271,7 +502,7 @@ export function createMonitoringStore(
         throw new Error(`未知转交目标：${command.newOwnerId}`);
       }
       const nowMs = operationalClock.nowMs();
-      const authorizedCommand = normalizeAndAuthorizeApproval(command, event, nowMs);
+      const authorizedCommand = normalizeAndAuthorizeApproval(command, event, actor, nowMs);
       const output = transitionVerification({
         event,
         task: verificationTaskForEvent(state.verificationTasksById, command.eventId),
@@ -396,15 +627,18 @@ export function createMonitoringStore(
         link = persistedLink ?? { ...link, status: result.status, controlEventId: result.controlEventId };
         const success = result.status === 'accepted' || result.status === 'duplicate';
         const now = new Date(operationalClock.nowMs()).toISOString();
+        const failureMessage = result.status === 'planning_gap'
+          ? `接管未完成：${result.errorMessage ?? '智能管控关键事实不足'}`
+          : `接管失败：${result.errorMessage ?? result.errorCode ?? '未知原因'}`;
         const finalEvent: MonitoringEvent = {
           ...currentEvent, lifecycleStatus: success ? 'taken_over' : 'handoff_failed',
-          controlEventId: result.controlEventId, takenOverAt: success ? result.acceptedAt ?? now : undefined,
+          controlEventId: success ? result.controlEventId : undefined, takenOverAt: success ? result.acceptedAt ?? now : undefined,
           version: currentEvent.version + 1, updatedAt: now,
         };
         const finalAudit: MonitoringAuditEntry = {
           entityId: eventId, entityType: 'handoff', occurredAt: now,
           kind: success ? 'handoff_succeeded' : 'handoff_failed', actorId: actor.userId,
-          summary: success ? `接管成功，关联智能管控事件 ${result.controlEventId}` : `接管失败：${result.errorMessage ?? result.errorCode ?? '未知原因'}`,
+          summary: success ? `接管成功，关联智能管控事件 ${result.controlEventId}` : failureMessage,
           payload: { handoffId: request.handoffId, idempotencyKey: request.idempotencyKey, controlEventId: result.controlEventId },
           simulation: event.simulation,
         };
@@ -416,8 +650,8 @@ export function createMonitoringStore(
           handoffLinksById: { ...current.handoffLinksById, [link.handoffId]: link },
           monitoringAuditEntries: [...current.monitoringAuditEntries, ...persistedAudit],
           handoffNotice: {
-            eventId, status: result.status, controlEventId: result.controlEventId,
-            message: success ? '接管成功，可查看智能管控或继续事件监测' : `接管失败：${result.errorMessage ?? result.errorCode ?? '请联系班长重试'}`,
+            eventId, status: result.status, controlEventId: success ? result.controlEventId : undefined,
+            message: success ? '接管成功，可查看智能管控或继续事件监测' : failureMessage,
           },
         }));
         return result;

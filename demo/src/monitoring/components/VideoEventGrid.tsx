@@ -58,6 +58,10 @@ export default function VideoEventGrid(props: VideoEventGridProps) {
 
   return (
     <section className="video-event-list-shell arco-card" aria-label="实时视频事件列表">
+      <header className="monitoring-section-heading video-event-list-heading">
+        <div><h2>实时事件</h2><p>按默认优先级展示待核实与持续监测事件</p></div>
+        <span className="arco-tag">{visibleItems.length} 起可见</span>
+      </header>
       {deferredVisibleCount > 0 ? (
         <button type="button" className="monitoring-new-events" onClick={revealNewEvents}>新增 {deferredVisibleCount} 起事件，点击查看</button>
       ) : undefined}

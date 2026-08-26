@@ -1074,14 +1074,20 @@ persistRuntime();
     acceptMonitoringHandoff: (request) => {
       const existingEvent = get().events.find((event) => event.monitoringHandoffs?.some((link) => link.idempotencyKey === request.idempotencyKey));
       const existingGap = get().planningGaps.find((gap) => gap.idempotencyKey === request.idempotencyKey);
-      const existingControlEventId = existingEvent?.id ?? existingGap?.controlEventId;
-      if (existingControlEventId) {
+      if (existingEvent) {
         return {
           messageId: `RESULT-${request.messageId}`, correlationId: request.correlationId, handoffId: request.handoffId,
-          status: 'duplicate', controlEventId: existingControlEventId, controlEventVersion: 1, retryable: false,
+          status: 'duplicate', controlEventId: existingEvent.id, controlEventVersion: 1, retryable: false,
         };
       }
       const acceptedAt = new Date().toISOString();
+      if (existingGap) {
+        return {
+          messageId: `RESULT-${request.messageId}`, correlationId: request.correlationId, handoffId: request.handoffId,
+          status: 'planning_gap', errorCode: 'CONTROL_PLANNING_GAP',
+          errorMessage: `关键事实不足：${existingGap.missingFacts.join('、')}`, retryable: false,
+        };
+      }
       const prepared = prepareControlHandoff(request, acceptedAt);
       if (prepared.kind === 'planning_gap') {
         set((state) => ({ planningGaps: [...state.planningGaps, prepared.gap] }));
@@ -1091,7 +1097,8 @@ persistRuntime();
         persistRuntime();
         return {
           messageId: `RESULT-${request.messageId}`, correlationId: request.correlationId, handoffId: request.handoffId,
-          status: 'accepted', controlEventId: prepared.gap.controlEventId, controlEventVersion: 1, acceptedAt, retryable: false,
+          status: 'planning_gap', errorCode: 'CONTROL_PLANNING_GAP',
+          errorMessage: `关键事实不足：${prepared.gap.missingFacts.join('、')}`, retryable: false,
         };
       }
       const acceptance = get().ingestEvent(prepared.input);

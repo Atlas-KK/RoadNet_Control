@@ -285,7 +285,7 @@ export function buildDemoScenario(
     return [
       alarmMessage({ scenarioId, seed, index: 1, offsetMs: 0, baseMs, eventType: 'traffic_accident', location,
         confidence: confidence(random, 0.91), videoAvailable,
-        observedFacts: { eventType: 'traffic_accident', location, lanesAffected: 2, lanesTotal: 3, vehicleCount: 2, casualties: 0 } }),
+        observedFacts: { eventType: 'traffic_accident', location, lanesAffected: 2, lanesTotal: 3, vehicleCount: 2, casualties: 0, flowVehPerHour: 1800, speedKmh: 35 } }),
       alarmMessage({ scenarioId, seed, index: 2, offsetMs: 8_000, baseMs, eventType: 'traffic_accident', location,
         sourceSystem: 'DEMO-VIDEO-AI-ADJACENT', sourceSuffix: 'ADJ-01', confidence: confidence(random, 0.88), videoAvailable,
         observedFacts: { eventType: 'traffic_accident', location, lanesAffected: 2, lanesTotal: 3, vehicleCount: 2 } }),
@@ -294,13 +294,13 @@ export function buildDemoScenario(
 
   if (scenarioId === 'tunnel-fire-l4') {
     const location: EventLocation = {
-      roadCode: 'G75', direction: 'up', kilometer: 88.4, longitude: 106.824, latitude: 29.885,
-      facilityId: 'TUN-G75-088', facilityType: 'tunnel', laneIds: ['1', '2', '3'], deviceId: 'CAM-TUN-088-07',
+      roadCode: 'G65S', direction: 'up', kilometer: 1264, longitude: 108.84, latitude: 33.79,
+      facilityId: 'TUN-G65S-1264', facilityType: 'tunnel', laneIds: ['1', '2', '3'], deviceId: 'CAM-1264',
     };
     return [
       alarmMessage({ scenarioId, seed, index: 1, offsetMs: 0, baseMs, eventType: 'fire', location,
         confidence: confidence(random, 0.94), videoAvailable,
-        observedFacts: { eventType: 'fire', location, lanesAffected: 3, lanesTotal: 3, notes: '检测到明火和浓烟' } }),
+        observedFacts: { eventType: 'fire', location, lanesAffected: 3, lanesTotal: 3, flowVehPerHour: 900, speedKmh: 20, notes: '检测到明火和浓烟' } }),
       alarmMessage({ scenarioId, seed, index: 2, offsetMs: 5_000, baseMs, eventType: 'fire', location,
         sourceSystem: 'DEMO-VIDEO-AI-THERMAL', sourceSuffix: 'THERMAL-01', confidence: confidence(random, 0.96), videoAvailable,
         observedFacts: { eventType: 'fire', location, lanesAffected: 3, lanesTotal: 3, notes: '热成像持续高温并伴随烟雾' } }),

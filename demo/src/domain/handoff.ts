@@ -35,7 +35,7 @@ export interface HandoffResult {
   messageId: string;
   correlationId: string;
   handoffId: string;
-  status: 'accepted' | 'rejected' | 'duplicate' | 'failed';
+  status: 'accepted' | 'rejected' | 'duplicate' | 'failed' | 'planning_gap';
   controlEventId?: string;
   controlEventVersion?: number;
   acceptedAt?: string;

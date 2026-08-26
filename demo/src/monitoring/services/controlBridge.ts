@@ -39,7 +39,7 @@ export class ControlBridge {
         controlEventVersion: existing.controlEventVersion, acceptedAt: existing.acceptedAt, retryable: false,
       };
     }
-    if (existing?.status === 'rejected' || (existing?.status === 'failed' && !existing.retryable)) {
+    if (existing?.status === 'rejected' || existing?.status === 'planning_gap' || (existing?.status === 'failed' && !existing.retryable)) {
       return {
         messageId: existing.resultMessageId ?? `RESULT-${request.messageId}`,
         correlationId: existing.correlationId ?? request.correlationId,

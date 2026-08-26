@@ -2,29 +2,20 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import AppHeader from './AppHeader';
 
-describe('FR-EM-001 AppHeader', () => {
-  it('渲染一级Tab并标识当前模块', () => {
-    const html = renderToStaticMarkup(
-      <AppHeader activeModule="event_monitoring" onActiveModuleChange={() => undefined} />,
-    );
-    expect(html).toContain('事件监测');
-    expect(html).toContain('智能管控');
-    expect(html).toContain('data-testid="module-tab-event_monitoring"');
-    expect(html).toContain('aria-selected="true"');
+describe('全局顶部状态栏', () => {
+  it('只呈现产品、系统状态和演示环境入口', () => {
+    const html = renderToStaticMarkup(<AppHeader demoToolsEnabled onDemoToolsOpen={() => undefined} />);
+    expect(html).toContain('路网综合管控智能体');
+    expect(html).toContain('系统在线');
+    expect(html).toContain('data-testid="demo-tools-trigger"');
+    expect(html).toContain('本地模拟');
+    expect(html).not.toContain('module-tab-event_monitoring');
   });
 
-  it('只在调用方传入时渲染模块操作区', () => {
-    const withoutActions = renderToStaticMarkup(
-      <AppHeader activeModule="event_monitoring" onActiveModuleChange={() => undefined} />,
-    );
-    const withActions = renderToStaticMarkup(
-      <AppHeader
-        activeModule="intelligent_control"
-        onActiveModuleChange={() => undefined}
-        moduleActions={<span data-testid="control-actions">管控操作</span>}
-      />,
-    );
-    expect(withoutActions).not.toContain('app-module-actions');
-    expect(withActions).toContain('data-testid="control-actions"');
+  it('正式环境隐藏演示入口并按需渲染模块操作', () => {
+    const html = renderToStaticMarkup(<AppHeader moduleActions={<span data-testid="control-actions">管控操作</span>} />);
+    expect(html).toContain('正式环境');
+    expect(html).not.toContain('data-testid="demo-tools-trigger"');
+    expect(html).toContain('data-testid="control-actions"');
   });
 });

@@ -133,6 +133,20 @@ describe('FR-EM-006 核实状态机唯一纯函数入口', () => {
     }, claimed.task)).toThrowError(expect.objectContaining({ code: 'REASON_REQUIRED' }));
   });
 
+  it('订正拒绝小数计数和影响车道数大于总车道数', () => {
+    const fractional = claim(event('L2'));
+    expect(() => run(fractional.event, {
+      type: 'confirm', eventId: fractional.event.monitoringEventId, expectedVersion: fractional.event.version,
+      corrections: { lanesAffected: 1.5, lanesTotal: 3 },
+    }, fractional.task)).toThrow('影响车道数必须是非负整数');
+
+    const inconsistent = claim(event('L2'));
+    expect(() => run(inconsistent.event, {
+      type: 'confirm', eventId: inconsistent.event.monitoringEventId, expectedVersion: inconsistent.event.version,
+      corrections: { lanesAffected: 3, lanesTotal: 2 },
+    }, inconsistent.task)).toThrow('影响车道数不能大于总车道数');
+  });
+
   it.each([
     ['false_positive', 'review_l4_false_positive'],
     ['observe', 'approve_l4_observation'],

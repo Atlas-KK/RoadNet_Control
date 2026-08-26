@@ -1,7 +1,7 @@
 // FR-EM-001：一级模块仅保存临时 UI 上下文，不进入业务 Store。
-export type ActiveModule = 'event_monitoring' | 'intelligent_control';
+export type ActiveModule = 'cockpit' | 'event_monitoring' | 'intelligent_control';
 
-export const DEFAULT_ACTIVE_MODULE: ActiveModule = 'event_monitoring';
+export const DEFAULT_ACTIVE_MODULE: ActiveModule = 'cockpit';
 export const ACTIVE_MODULE_SESSION_KEY = 'roadgov-mvp:active-module';
 
 export interface SessionStorageLike {
@@ -10,7 +10,7 @@ export interface SessionStorageLike {
 }
 
 export function parseActiveModule(value: unknown): ActiveModule {
-  return value === 'event_monitoring' || value === 'intelligent_control'
+  return value === 'cockpit' || value === 'event_monitoring' || value === 'intelligent_control'
     ? value
     : DEFAULT_ACTIVE_MODULE;
 }

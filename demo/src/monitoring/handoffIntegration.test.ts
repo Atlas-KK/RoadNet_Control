@@ -111,7 +111,9 @@ describe('阶段8 监测到智能管控接管闭环', () => {
   it('关键研判参数不足时只创建PlanningGap，不生成事件、预案或Measure', () => {
     const request = fullRequest('KEY-GAP'); request.context.trafficSnapshot = undefined;
     const result = useStore.getState().acceptMonitoringHandoff(request);
-    expect(result.status).toBe('accepted');
+    expect(result).toMatchObject({ status: 'planning_gap', errorCode: 'CONTROL_PLANNING_GAP', retryable: false });
+    expect(result.controlEventId).toBeUndefined();
+    expect(useStore.getState().acceptMonitoringHandoff(request).status).toBe('planning_gap');
     expect(useStore.getState().planningGaps).toMatchObject([{ idempotencyKey: 'KEY-GAP', missingFacts: ['交通流量'] }]);
     expect(useStore.getState().events).toHaveLength(0); expect(useStore.getState().plans).toHaveLength(0);
   });

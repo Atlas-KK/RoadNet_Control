@@ -274,6 +274,7 @@ export class DemoMonitoringAdapter implements MonitoringSourceAdapter {
       const first = messages[0];
       const last = messages.at(-1);
       if (!first || !last) throw new Error('模拟源事件摘要缺少告警');
+      if (!first.payload.scenarioId) throw new Error('模拟源事件摘要缺少场景标识');
       return {
         eventId,
         scenarioId: first.payload.scenarioId,

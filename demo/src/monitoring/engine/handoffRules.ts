@@ -42,9 +42,10 @@ function latestCorrections(eventId: string, auditEntries: readonly MonitoringAud
 export function deriveConfirmedEventFacts(event: MonitoringEvent, auditEntries: readonly MonitoringAuditEntry[]): ConfirmedEventFacts {
   const corrections = latestCorrections(event.monitoringEventId, auditEntries);
   return {
+    ...event.sourceFacts,
     ...corrections,
-    eventType: corrections.eventType ?? event.eventType,
-    location: { ...event.location, ...(corrections.location ?? {}) },
+    eventType: corrections.eventType ?? event.sourceFacts?.eventType ?? event.eventType,
+    location: { ...event.location, ...(event.sourceFacts?.location ?? {}), ...(corrections.location ?? {}) },
   };
 }
 
@@ -102,7 +103,15 @@ export function buildHandoffRequest(input: {
       facilityId, facilityType: facts.location.facilityType,
       configuredSensitiveFacility: Boolean(facilityId && MONITORING_LEVEL_CONFIG.sensitiveFacilityIds.includes(facilityId)),
       configuredCriticalNode: Boolean(nearestKeyNode),
-      trafficSnapshot: facts.queueLengthKm === undefined ? undefined : { queueLengthKm: facts.queueLengthKm },
+      trafficSnapshot: facts.queueLengthKm === undefined
+        && facts.flowVehPerHour === undefined
+        && facts.speedKmh === undefined
+        ? undefined
+        : {
+            queueLengthKm: facts.queueLengthKm,
+            flowVehPerHour: facts.flowVehPerHour,
+            speedKmh: facts.speedKmh,
+          },
     },
     evidence: [], conflicts: [...event.conflicts],
     rationale: { level: decision.level, reasons: [...decision.reasons], reviewerId: actor.userId },

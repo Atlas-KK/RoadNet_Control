@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { getBrowserSessionStorage } from '../../appShellState';
 import {
   MONITORING_EVENT_TYPES,
   type MonitoringEventType,
@@ -10,7 +11,7 @@ import {
   type SupervisorApproval,
   type VerificationCommand,
 } from '../engine/verificationMachine';
-import { findSimulatedUser, hasMonitoringPermission, SIMULATED_USERS, type SimulatedUser } from '../permissions';
+import { findSimulatedUser, hasMonitoringPermission, type SimulatedUser } from '../permissions';
 import {
   MONITORING_EVENT_TYPE_LABELS,
   MONITORING_LEVEL_LABELS,
@@ -18,6 +19,7 @@ import {
 } from '../selectors';
 import { SystemOperationalClock } from '../services/operationalClock';
 import { selectCurrentSimulatedUser, useMonitoringStore } from '../store';
+import { clearVerificationDraft, persistVerificationDraft, readVerificationDraft } from '../services/verificationDraft';
 import EvidencePanel from './EvidencePanel';
 import '../verification.css';
 
@@ -50,6 +52,11 @@ function numericValue(value: string): number | undefined {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
 }
 
+function integerValue(value: string): number | undefined {
+  const parsed = numericValue(value);
+  return parsed !== undefined && Number.isSafeInteger(parsed) ? parsed : undefined;
+}
+
 interface VerificationPanelProps {
   item: MonitoringListItem;
   taskOverride?: VerificationTask;
@@ -68,21 +75,49 @@ export default function VerificationPanel({ item, taskOverride, currentUserOverr
   );
   const task = taskOverride ?? storedTask;
   const currentUser = currentUserOverride ?? storeCurrentUser;
+  const draftStorage = getBrowserSessionStorage();
+  const restoredDraft = useMemo(
+    () => readVerificationDraft(draftStorage, event.monitoringEventId, currentUser.userId),
+    [currentUser.userId, draftStorage, event.monitoringEventId],
+  );
   const remaining = useCountdown(task?.nextReviewAt ?? event.nextReviewAt);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string>();
-  const [eventType, setEventType] = useState<MonitoringEventType>(event.eventType);
-  const [confirmedLevel, setConfirmedLevel] = useState<MonitoringLevel>(event.confirmedLevel ?? event.suggestedLevel);
-  const [roadCode, setRoadCode] = useState(event.location.roadCode);
-  const [direction, setDirection] = useState(event.location.direction);
-  const [kilometer, setKilometer] = useState(event.location.kilometer?.toString() ?? '');
-  const [lanesAffected, setLanesAffected] = useState('');
-  const [vehicleCount, setVehicleCount] = useState('');
-  const [casualties, setCasualties] = useState('');
-  const [hazardousMaterials, setHazardousMaterials] = useState(false);
-  const [reason, setReason] = useState('');
-  const [notes, setNotes] = useState('');
-  const [supervisorId, setSupervisorId] = useState('');
+  const draft = restoredDraft?.fields;
+  const [eventType, setEventType] = useState<MonitoringEventType>(draft?.eventType ?? event.eventType);
+  const [confirmedLevel, setConfirmedLevel] = useState<MonitoringLevel>(draft?.confirmedLevel ?? event.confirmedLevel ?? event.suggestedLevel);
+  const [roadCode, setRoadCode] = useState(draft?.roadCode ?? event.location.roadCode);
+  const [direction, setDirection] = useState(draft?.direction ?? event.location.direction);
+  const [kilometer, setKilometer] = useState(draft?.kilometer ?? event.sourceFacts?.location?.kilometer?.toString() ?? event.location.kilometer?.toString() ?? '');
+  const [lanesAffected, setLanesAffected] = useState(draft?.lanesAffected ?? event.sourceFacts?.lanesAffected?.toString() ?? '');
+  const [lanesTotal, setLanesTotal] = useState(draft?.lanesTotal ?? event.sourceFacts?.lanesTotal?.toString() ?? '');
+  const [vehicleCount, setVehicleCount] = useState(draft?.vehicleCount ?? event.sourceFacts?.vehicleCount?.toString() ?? '');
+  const [casualties, setCasualties] = useState(draft?.casualties ?? event.sourceFacts?.casualties?.toString() ?? '');
+  const [flowVehPerHour, setFlowVehPerHour] = useState(draft?.flowVehPerHour ?? event.sourceFacts?.flowVehPerHour?.toString() ?? '');
+  const [speedKmh, setSpeedKmh] = useState(draft?.speedKmh ?? event.sourceFacts?.speedKmh?.toString() ?? '');
+  const [hazardousMaterials, setHazardousMaterials] = useState(draft?.hazardousMaterials ?? false);
+  const [reason, setReason] = useState(draft?.reason ?? '');
+  const [notes, setNotes] = useState(draft?.notes ?? '');
+  const draftResetState = useMemo(() => ({
+    eventType: restoredDraft?.fields.eventType ?? event.eventType,
+    confirmedLevel: restoredDraft?.fields.confirmedLevel ?? event.confirmedLevel ?? event.suggestedLevel,
+    roadCode: restoredDraft?.fields.roadCode ?? event.location.roadCode,
+    direction: restoredDraft?.fields.direction ?? event.location.direction,
+    kilometer: restoredDraft?.fields.kilometer ?? event.sourceFacts?.location?.kilometer?.toString() ?? event.location.kilometer?.toString() ?? '',
+    lanesAffected: restoredDraft?.fields.lanesAffected ?? event.sourceFacts?.lanesAffected?.toString() ?? '',
+    lanesTotal: restoredDraft?.fields.lanesTotal ?? event.sourceFacts?.lanesTotal?.toString() ?? '',
+    vehicleCount: restoredDraft?.fields.vehicleCount ?? event.sourceFacts?.vehicleCount?.toString() ?? '',
+    casualties: restoredDraft?.fields.casualties ?? event.sourceFacts?.casualties?.toString() ?? '',
+    flowVehPerHour: restoredDraft?.fields.flowVehPerHour ?? event.sourceFacts?.flowVehPerHour?.toString() ?? '',
+    speedKmh: restoredDraft?.fields.speedKmh ?? event.sourceFacts?.speedKmh?.toString() ?? '',
+    hazardousMaterials: restoredDraft?.fields.hazardousMaterials ?? false,
+    reason: restoredDraft?.fields.reason ?? '',
+    notes: restoredDraft?.fields.notes ?? '',
+    restoredAt: restoredDraft?.savedAt,
+  }), [
+    event.confirmedLevel, event.eventType, event.location.direction, event.location.kilometer,
+    event.location.roadCode, event.sourceFacts, event.suggestedLevel, restoredDraft,
+  ]);
 
   const owner = task?.ownerId ? findSimulatedUser(task.ownerId) : undefined;
   const ownedByMe = task?.status === 'claimed' && task.ownerId === currentUser.userId;
@@ -90,10 +125,41 @@ export default function VerificationPanel({ item, taskOverride, currentUserOverr
   const finalStatus = event.verificationStatus === 'confirmed' || event.verificationStatus === 'false_positive';
   const canVerify = hasMonitoringPermission(currentUser, 'verify_event');
   const canTransfer = hasMonitoringPermission(currentUser, 'transfer_task');
-  const supervisorOptions = SIMULATED_USERS.filter((user) => user.role === 'supervisor');
 
+  useEffect(() => {
+    setEventType(draftResetState.eventType);
+    setConfirmedLevel(draftResetState.confirmedLevel);
+    setRoadCode(draftResetState.roadCode);
+    setDirection(draftResetState.direction);
+    setKilometer(draftResetState.kilometer);
+    setLanesAffected(draftResetState.lanesAffected);
+    setLanesTotal(draftResetState.lanesTotal);
+    setVehicleCount(draftResetState.vehicleCount);
+    setCasualties(draftResetState.casualties);
+    setFlowVehPerHour(draftResetState.flowVehPerHour);
+    setSpeedKmh(draftResetState.speedKmh);
+    setHazardousMaterials(draftResetState.hazardousMaterials);
+    setReason(draftResetState.reason);
+    setNotes(draftResetState.notes);
+    setNotice(draftResetState.restoredAt
+      ? `已恢复${new Date(draftResetState.restoredAt).toLocaleString('zh-CN')}保存的未提交核实草稿`
+      : undefined);
+  }, [draftResetState]);
+
+  useEffect(() => {
+    if (!ownedByMe) return;
+    persistVerificationDraft(draftStorage, {
+      version: 1, eventId: event.monitoringEventId, userId: currentUser.userId, savedAt: new Date().toISOString(),
+      fields: {
+        eventType, confirmedLevel, roadCode, direction, kilometer, lanesAffected, lanesTotal,
+        vehicleCount, casualties, flowVehPerHour, speedKmh, hazardousMaterials, reason, notes,
+      },
+    });
+  }, [casualties, confirmedLevel, currentUser.userId, direction, draftStorage, event.monitoringEventId, eventType, flowVehPerHour, hazardousMaterials, kilometer, lanesAffected, lanesTotal, notes, ownedByMe, reason, roadCode, speedKmh, vehicleCount]);
   const approval = (permission: SupervisorApproval['permission']): SupervisorApproval | undefined => (
-    supervisorId ? { approvedBy: supervisorId, approvedAt: '', permission } : undefined
+    hasMonitoringPermission(currentUser, permission)
+      ? { approvedBy: currentUser.userId, approvedAt: '', permission }
+      : undefined
   );
 
   const execute = async (command: VerificationCommand, success: string) => {
@@ -101,6 +167,9 @@ export default function VerificationPanel({ item, taskOverride, currentUserOverr
     setNotice(undefined);
     try {
       const output = await applyCommand(command);
+      if (command.type !== 'claim' && command.type !== 'force_transfer') {
+        clearVerificationDraft(draftStorage, event.monitoringEventId, currentUser.userId);
+      }
       setNotice(output.requiresSupervisorAttention ? `${success}；已连续观察两次，需班长关注` : success);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : '核实操作失败');
@@ -117,9 +186,12 @@ export default function VerificationPanel({ item, taskOverride, currentUserOverr
       direction,
       kilometer: numericValue(kilometer),
     },
-    lanesAffected: numericValue(lanesAffected),
-    vehicleCount: numericValue(vehicleCount),
-    casualties: numericValue(casualties),
+    lanesAffected: integerValue(lanesAffected),
+    lanesTotal: integerValue(lanesTotal),
+    vehicleCount: integerValue(vehicleCount),
+    casualties: integerValue(casualties),
+    flowVehPerHour: numericValue(flowVehPerHour),
+    speedKmh: numericValue(speedKmh),
     hazardousMaterials,
     notes: notes.trim() || undefined,
   };
@@ -169,15 +241,18 @@ export default function VerificationPanel({ item, taskOverride, currentUserOverr
               <label>路线<input value={roadCode} onChange={(change) => setRoadCode(change.target.value)} /></label>
               <label>方向<select value={direction} onChange={(change) => setDirection(change.target.value as typeof direction)}><option value="up">上行</option><option value="down">下行</option><option value="unknown">未知</option></select></label>
               <label>桩号<input type="number" min="0" step="0.1" value={kilometer} onChange={(change) => setKilometer(change.target.value)} /></label>
-              <label>影响车道数<input type="number" min="0" value={lanesAffected} onChange={(change) => setLanesAffected(change.target.value)} /></label>
-              <label>涉及车辆数<input type="number" min="0" value={vehicleCount} onChange={(change) => setVehicleCount(change.target.value)} /></label>
-              <label>伤亡人数<input type="number" min="0" value={casualties} onChange={(change) => setCasualties(change.target.value)} /></label>
+              <label>影响车道数<input type="number" min="0" step="1" value={lanesAffected} onChange={(change) => setLanesAffected(change.target.value)} /></label>
+              <label>总车道数<input type="number" min="1" step="1" value={lanesTotal} onChange={(change) => setLanesTotal(change.target.value)} /></label>
+              <label>涉及车辆数<input type="number" min="0" step="1" value={vehicleCount} onChange={(change) => setVehicleCount(change.target.value)} /></label>
+              <label>伤亡人数<input type="number" min="0" step="1" value={casualties} onChange={(change) => setCasualties(change.target.value)} /></label>
+              <label>流量（辆/小时）<input type="number" min="0" step="1" value={flowVehPerHour} onChange={(change) => setFlowVehPerHour(change.target.value)} /></label>
+              <label>车速（公里/小时）<input type="number" min="0" step="0.1" value={speedKmh} onChange={(change) => setSpeedKmh(change.target.value)} /></label>
             </div>
             <label className="verification-checkbox"><input type="checkbox" checked={hazardousMaterials} onChange={(change) => setHazardousMaterials(change.target.checked)} />涉及危化品</label>
             <label>核实依据/等级调整原因<textarea value={reason} onChange={(change) => setReason(change.target.value)} placeholder="误报、观察及L3/L4降级时必填" /></label>
             <label>订正备注<textarea value={notes} onChange={(change) => setNotes(change.target.value)} placeholder="历史结论不会覆盖，本次内容将追加为新版本" /></label>
             {(isL4 || isL4Downgrade) ? (
-              <label>班长复核<select value={supervisorId} onChange={(change) => setSupervisorId(change.target.value)}><option value="">未选择（受限操作将被拒绝）</option>{supervisorOptions.map((user) => <option key={user.userId} value={user.userId}>{user.displayName}</option>)}</select></label>
+              <p className="verification-permission-hint">L4降级、误报或持续观察必须由当前登录的监控班长本人接管任务后提交。</p>
             ) : undefined}
             <div className="verification-submit-actions">
               <button type="button" className="arco-button arco-button-primary" disabled={busy} onClick={() => execute({

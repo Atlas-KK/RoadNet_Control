@@ -22,7 +22,7 @@ describe('FR-EM-006 人工核实操作台', () => {
     expect(useMonitoringStore.getState().verificationTasksById).toEqual({});
   });
 
-  it('当前用户占用后展示完整订正字段、结论操作和L4班长复核入口', () => {
+  it('当前用户占用后展示完整订正字段、结论操作和L4本人审批提示', () => {
     const item = monitoringListItemFixture();
     const claimedEvent = {
       ...item.event,
@@ -40,7 +40,8 @@ describe('FR-EM-006 人工核实操作台', () => {
     const html = renderToStaticMarkup(
       <VerificationPanel item={{ ...item, event: claimedEvent }} taskOverride={claimedTask} currentUserOverride={SIMULATED_USERS[0]} />,
     );
-    for (const label of ['事件类型', '人工确认等级', '影响车道数', '涉及车辆数', '伤亡人数', '涉及危化品', '班长复核']) {
+    for (const label of ['事件类型', '人工确认等级', '影响车道数', '总车道数', '涉及车辆数', '伤亡人数', '流量（辆/小时）', '车速（公里/小时）', '涉及危化品',
+      '必须由当前登录的监控班长本人']) {
       expect(html).toContain(label);
     }
     for (const action of ['确认事件', '持续观察', '判定误报', '释放任务']) expect(html).toContain(action);

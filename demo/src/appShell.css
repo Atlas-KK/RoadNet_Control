@@ -1,97 +1,293 @@
-/* FR-EM-001 AppShell及一、二级模块导航。 */
-.app-module-tabs,
-.monitoring-view-tabs {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px;
-  background: var(--color-panel-2);
-}
-
-.app-module-tab,
-.monitoring-view-tab {
-  min-height: 32px;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  padding: 0 16px;
-  color: var(--color-ink-soft);
-  font-size: 13px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-
-.app-module-tab:hover,
-.monitoring-view-tab:hover {
-  color: var(--color-brand-700);
-  background: var(--color-brand-50);
-}
-
-.app-module-tab[aria-selected='true'],
-.monitoring-view-tab[aria-selected='true'] {
-  border-color: var(--color-brand-100);
-  background: var(--color-panel);
-  color: var(--color-brand-700);
-  box-shadow: 0 1px 3px rgb(29 33 41 / 8%);
-}
-
-.event-monitoring-workspace {
+.app-shell {
+  min-width: 1120px;
   overflow: hidden;
 }
 
-.monitoring-view-tabs {
-  width: fit-content;
-  flex: 0 0 auto;
+.app-header {
+  position: relative;
+  z-index: 50;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-panel);
+  box-shadow: 0 1px 3px rgb(29 33 41 / 4%);
 }
 
-.monitoring-view-placeholder {
+.app-brand {
+  min-width: 192px;
+}
+
+.app-system-health {
+  font-variant-numeric: tabular-nums;
+}
+
+.app-environment-trigger,
+.app-production-tag {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--color-warn-100);
+  border-radius: 4px;
+  padding: 0 9px;
+  background: var(--color-warn-50);
+  color: var(--color-warn);
+  font-size: 11px;
+}
+
+.app-environment-trigger:hover {
+  border-color: var(--color-warn);
+  background: #fff3d8;
+}
+
+.app-environment-trigger strong {
+  font-weight: 600;
+}
+
+.app-production-tag {
+  border-color: var(--color-pass-100);
+  background: var(--color-pass-50);
+  color: var(--color-pass);
+}
+
+.app-shell-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.app-sidebar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  width: 208px;
+  min-width: 208px;
+  flex-direction: column;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+  transition: width 180ms ease, min-width 180ms ease;
+}
+
+.app-sidebar[data-collapsed='true'] {
+  width: 64px;
+  min-width: 64px;
+}
+
+.app-sidebar-nav {
   display: flex;
   min-height: 0;
   flex: 1;
   flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+  padding: 8px 0;
+}
+
+.app-nav-group,
+.app-nav-children {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app-nav-item,
+.app-nav-child,
+.app-sidebar-collapse {
+  position: relative;
+  display: flex;
+  width: 100%;
+  min-height: 40px;
   align-items: center;
-  justify-content: center;
-  padding: 32px;
-  text-align: center;
+  gap: 10px;
+  border: 0;
+  border-radius: 0;
+  padding: 0 16px;
+  background: transparent;
+  color: rgb(0 0 0 / 85%);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  text-align: left;
+  white-space: nowrap;
 }
 
-.monitoring-placeholder-mark {
+.app-nav-item:hover,
+.app-nav-child:hover,
+.app-sidebar-collapse:hover {
+  background: #f5f5f5;
+  color: #1890ff;
+}
+
+.app-nav-group[data-active='true'] > .app-nav-parent {
+  color: #1890ff;
+}
+
+.app-nav-item[aria-current='page'],
+.app-nav-child[aria-current='page'] {
+  background: #e6f7ff;
+  color: #1890ff;
+  box-shadow: inset -3px 0 0 #1890ff;
+}
+
+.app-nav-icon {
   display: grid;
-  width: 52px;
-  height: 52px;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
   place-items: center;
-  border: 1px solid var(--color-brand-100);
-  border-radius: 12px;
-  background: var(--color-brand-50);
-  color: var(--color-brand-700);
-  font-size: 24px;
+  overflow: hidden;
 }
 
-.monitoring-view-placeholder h1 {
-  margin: 16px 0 4px;
-  color: var(--color-ink);
+.app-nav-icon img {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+
+
+.app-nav-chevron {
+  display: block;
+  width: 10px;
+  height: 9px;
+  margin-left: auto;
+}
+
+.app-nav-child {
+  justify-content: flex-start;
+  padding: 9px 40px;
+}
+
+.app-sidebar-collapse {
+  min-height: 40px;
+  flex: 0 0 40px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.app-sidebar-collapse img {
+  display: block;
+  width: 16px;
+  height: 16px;
+  transition: transform 180ms ease;
+}
+
+.app-sidebar[data-collapsed='true'] .app-nav-label,
+.app-sidebar[data-collapsed='true'] .app-nav-chevron,
+.app-sidebar[data-collapsed='true'] .app-nav-children {
+  display: none;
+}
+
+.app-sidebar[data-collapsed='true'] .app-nav-item,
+.app-sidebar[data-collapsed='true'] .app-sidebar-collapse {
+  justify-content: center;
+  padding-right: 0;
+  padding-left: 0;
+}
+
+.app-sidebar[data-collapsed='true'] .app-nav-group[data-active='true'] > .app-nav-parent {
+  background: #e6f7ff;
+  box-shadow: inset -3px 0 0 #1890ff;
+}
+
+.app-sidebar[data-collapsed='true'] .app-sidebar-collapse img {
+  transform: rotate(180deg);
+}
+.app-workspace {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex: 1;
+  overflow: hidden;
+  padding: 12px;
+}
+
+.cockpit-workspace,
+.intelligent-control-module {
+  min-width: 0;
+  overflow: auto;
+}
+
+.cockpit-overview-content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px;
+}
+
+.cockpit-overview-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border-bottom: 1px solid var(--color-line);
+  padding: 0 2px 16px;
+}
+
+.cockpit-overview-intro h2 {
+  margin: 3px 0 2px;
   font-size: 18px;
   font-weight: 600;
 }
 
-.monitoring-view-placeholder p {
-  max-width: 560px;
-  margin: 0 0 16px;
-  color: var(--color-ink-soft);
-  font-size: 13px;
+.cockpit-overview-intro p {
+  margin: 0;
+  color: var(--color-ink-muted);
+  font-size: 12px;
+}
+
+.cockpit-eyebrow {
+  color: var(--color-brand-700);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .08em;
+}
+
+.intelligent-control-module > .app-main {
+  flex: 1;
+  min-height: 520px;
+}
+
+@media (max-width: 1280px) {
+  .app-workspace {
+    padding: 10px;
+  }
 }
 
 @media (max-width: 1180px) {
-  .app-header {
-    align-items: center;
-  }
-
-  .app-module-actions {
-    max-width: 100%;
-    overflow-x: auto;
-  }
-
-  .event-monitoring-workspace {
-    min-height: 560px;
+  .app-shell {
+    min-width: 0;
+    min-height: 100%;
     overflow: visible;
+  }
+
+  .app-header {
+    position: sticky;
+    top: 0;
+  }
+
+  .app-sidebar {
+    width: 64px;
+    min-width: 64px;
+  }
+
+  .app-sidebar .app-nav-label,
+  .app-sidebar .app-nav-chevron,
+  .app-sidebar .app-nav-children {
+    display: none;
+  }
+
+  .app-sidebar .app-nav-item,
+  .app-sidebar .app-sidebar-collapse {
+    justify-content: center;
+    padding-right: 0;
+    padding-left: 0;
+  }
+
+  .app-sidebar .app-nav-group[data-active='true'] > .app-nav-parent {
+    background: #e6f7ff;
+    box-shadow: inset -3px 0 0 #1890ff;
+  }
+
+  .app-shell-body,
+  .app-workspace {
+    min-height: calc(100vh - 56px);
   }
 }

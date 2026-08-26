@@ -199,8 +199,15 @@ export interface SyncTransitionCommit {
   auditEntries: readonly MonitoringAuditEntry[];
 }
 
-export interface MonitoringRepository {
-  readonly kind: 'indexeddb' | 'memory';
+export interface SourceAlarmIngestionCommit {
+  alarm?: Alarm;
+  receipt: AlarmDeliveryReceipt;
+  event?: MonitoringEvent;
+  expectedEventVersion?: number;
+  auditEntries: readonly MonitoringAuditEntry[];
+}
+
+export interface MonitoringRepository {  readonly kind: 'indexeddb' | 'memory';
   open(): Promise<void>;
   close(): void;
   addAlarm(alarm: Alarm): Promise<void>;
@@ -209,6 +216,7 @@ export interface MonitoringRepository {
   addReceipt(receipt: AlarmDeliveryReceipt): Promise<void>;
   getReceiptByMessageId(messageId: string): Promise<AlarmDeliveryReceipt | undefined>;
   addAlarmWithReceipt(alarm: Alarm, receipt: AlarmDeliveryReceipt): Promise<void>;
+  commitSourceAlarmIngestion(commit: SourceAlarmIngestionCommit): Promise<MonitoringAuditEntry[]>;
   addAssessment(assessment: AlarmAssessment): Promise<void>;
   listAssessments(): Promise<AlarmAssessment[]>;
   putEvent(event: MonitoringEvent, expectedVersion?: number): Promise<void>;
@@ -231,6 +239,7 @@ export interface MonitoringRepository {
   getSyncReceipt(messageId: string): Promise<CrossModuleSyncReceipt | undefined>;
   listSyncReceipts(): Promise<CrossModuleSyncReceipt[]>;
   commitSyncTransition(commit: SyncTransitionCommit): Promise<MonitoringAuditEntry[]>;
+  clearMonitoringDemoData(): Promise<void>;
   loadProjection(): Promise<MonitoringProjection>;
 }
 
@@ -346,8 +355,35 @@ export class IndexedDbMonitoringRepository implements MonitoringRepository {
     ]);
   }
 
-  async addAssessment(assessment: AlarmAssessment): Promise<void> {
+  async commitSourceAlarmIngestion(commit: SourceAlarmIngestionCommit): Promise<MonitoringAuditEntry[]> {
     const db = await this.database();
+    const transaction = db.transaction(['alarms', 'receipts', 'events', 'monitoringAudit'], 'readwrite');
+    const done = transactionDone(transaction);
+    const writes: Promise<unknown>[] = [];
+    if (commit.event) {
+      const eventStore = transaction.objectStore('events');
+      const current = await requestResult(eventStore.get(commit.event.monitoringEventId)) as MonitoringEvent | undefined;
+      if (commit.expectedEventVersion !== undefined && current?.version !== commit.expectedEventVersion) {
+        transaction.abort();
+        await done.catch(() => undefined);
+        throw new MonitoringVersionConflictError(commit.event.monitoringEventId, commit.expectedEventVersion, current?.version);
+      }
+      if (commit.expectedEventVersion === undefined && current) {
+        transaction.abort();
+        await done.catch(() => undefined);
+        throw new MonitoringConstraintError(`监测事件已存在：${commit.event.monitoringEventId}`);
+      }
+      writes.push(requestResult(eventStore.put(clone(commit.event))));
+    }
+    if (commit.alarm) writes.push(requestResult(transaction.objectStore('alarms').add(clone(commit.alarm))));
+    writes.push(requestResult(transaction.objectStore('receipts').add(clone(commit.receipt))));
+    const auditStore = transaction.objectStore('monitoringAudit');
+    const auditKeys = commit.auditEntries.map((entry) => requestResult(auditStore.add(clone(entry))));
+    const [, keys] = await Promise.all([Promise.all(writes), Promise.all(auditKeys), done]);
+    return commit.auditEntries.map((entry, index) => ({ ...entry, seq: Number(keys[index]) }));
+  }
+
+  async addAssessment(assessment: AlarmAssessment): Promise<void> {    const db = await this.database();
     const transaction = db.transaction('assessments', 'readwrite');
     const done = transactionDone(transaction);
     await requestResult(transaction.objectStore('assessments').add(clone(assessment)));
@@ -568,8 +604,18 @@ export class IndexedDbMonitoringRepository implements MonitoringRepository {
     };
   }
 
-  private async put<T>(storeName: MonitoringStoreName, value: T): Promise<void> {
+  async clearMonitoringDemoData(): Promise<void> {
     const db = await this.database();
+    const stores = MONITORING_DB_SCHEMA.map((definition) => definition.name);
+    const transaction = db.transaction(stores, 'readwrite');
+    const done = transactionDone(transaction);
+    await Promise.all([
+      ...stores.map((storeName) => requestResult(transaction.objectStore(storeName).clear())),
+      done,
+    ]);
+  }
+
+  private async put<T>(storeName: MonitoringStoreName, value: T): Promise<void> {    const db = await this.database();
     const transaction = db.transaction(storeName, 'readwrite');
     const done = transactionDone(transaction);
     await requestResult(transaction.objectStore(storeName).put(clone(value)));
@@ -648,8 +694,31 @@ export class MemoryMonitoringRepository implements MonitoringRepository {
     await this.addReceipt(receipt);
   }
 
-  async addAssessment(assessment: AlarmAssessment): Promise<void> {
-    if (this.assessments.has(assessment.assessmentId)) {
+  async commitSourceAlarmIngestion(commit: SourceAlarmIngestionCommit): Promise<MonitoringAuditEntry[]> {
+    if (commit.alarm) this.assertAlarmUnique(commit.alarm);
+    this.assertReceiptUnique(commit.receipt);
+    if (commit.event) {
+      const current = this.events.get(commit.event.monitoringEventId);
+      if (commit.expectedEventVersion !== undefined && current?.version !== commit.expectedEventVersion) {
+        throw new MonitoringVersionConflictError(commit.event.monitoringEventId, commit.expectedEventVersion, current?.version);
+      }
+      if (commit.expectedEventVersion === undefined && current) {
+        throw new MonitoringConstraintError(`监测事件已存在：${commit.event.monitoringEventId}`);
+      }
+    }
+    if (commit.alarm) {
+      this.alarms.set(commit.alarm.alarmId, freezeAlarm(clone(commit.alarm)));
+      this.sourceAlarmKeys.add(`${commit.alarm.sourceSystem}\u0000${commit.alarm.sourceAlarmId}`);
+    }
+    this.receiptById.set(commit.receipt.receiptId, clone(commit.receipt));
+    this.receiptIdByMessage.set(commit.receipt.messageId, commit.receipt.receiptId);
+    if (commit.event) this.events.set(commit.event.monitoringEventId, clone(commit.event));
+    const persisted = commit.auditEntries.map((entry, index) => ({ ...clone(entry), seq: this.audit.length + index + 1 }));
+    this.audit.push(...persisted);
+    return persisted.map(clone);
+  }
+
+  async addAssessment(assessment: AlarmAssessment): Promise<void> {    if (this.assessments.has(assessment.assessmentId)) {
       throw new MonitoringConstraintError(`重复核实记录：${assessment.assessmentId}`);
     }
     this.assessments.set(assessment.assessmentId, clone(assessment));
@@ -819,6 +888,21 @@ export class MemoryMonitoringRepository implements MonitoringRepository {
       syncReceipts: await this.listSyncReceipts(),
       outboxMessages: await this.listOutboxMessages(),
     };
+  }
+
+  async clearMonitoringDemoData(): Promise<void> {
+    this.alarms.clear();
+    this.receiptById.clear();
+    this.receiptIdByMessage.clear();
+    this.sourceAlarmKeys.clear();
+    this.assessments.clear();
+    this.events.clear();
+    this.tasks.clear();
+    this.handoffs.clear();
+    this.handoffIdByKey.clear();
+    this.outbox.clear();
+    this.syncInbox.clear();
+    this.audit.length = 0;
   }
 }
 

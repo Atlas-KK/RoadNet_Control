@@ -31,7 +31,7 @@ export interface SourceEvidenceReference {
 }
 
 export interface SourceAlarmPayload {
-  scenarioId: DemoScenarioId;
+  scenarioId?: DemoScenarioId;
   sourceAlarmId: string;
   sourceType: SourceType;
   sourceSystem: string;

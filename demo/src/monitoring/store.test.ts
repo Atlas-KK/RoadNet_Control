@@ -127,7 +127,7 @@ describe('阶段6 核实动作、并发和L4权限', () => {
     expect(Object.values(store.getState().verificationTasksById)[0]?.ownerId).toBe('USR-SUPERVISOR-01');
   });
 
-  it('L4班长审批身份必须真实具备对应权限', async () => {
+  it('监测员不能冒用真实班长ID审批，班长本人接管后才可提交', async () => {
     const repository = new MemoryMonitoringRepository();
     await repository.putEvent({ ...event(), suggestedLevel: 'L4' });
     const store = createMonitoringStore(repository, { nowMs: () => Date.parse('2026-08-25T02:01:00.000Z') });
@@ -136,10 +136,20 @@ describe('阶段6 核实动作、并发和L4权限', () => {
     await expect(store.getState().applyVerificationCommand({
       type: 'false_positive', eventId: 'ME-001', expectedVersion: 2, reason: '光影误检',
       supervisorApproval: {
-        approvedBy: 'USR-ADMIN-01', approvedAt: '', permission: 'review_l4_false_positive',
+        approvedBy: 'USR-SUPERVISOR-01', approvedAt: '', permission: 'review_l4_false_positive',
       },
     })).rejects.toBeInstanceOf(MonitoringPermissionError);
     expect(store.getState().monitoringEventsById['ME-001']?.verificationStatus).toBe('verifying');
+
+    store.getState().setCurrentUser('USR-SUPERVISOR-01');
+    await store.getState().applyVerificationCommand({
+      type: 'force_transfer', eventId: 'ME-001', expectedVersion: 2,
+      newOwnerId: 'USR-SUPERVISOR-01', reason: 'L4受限结论由班长本人复核',
+    });
+    await store.getState().applyVerificationCommand({
+      type: 'false_positive', eventId: 'ME-001', expectedVersion: 3, reason: '光影误检',
+      supervisorApproval: { approvedBy: 'USR-SUPERVISOR-01', approvedAt: '', permission: 'review_l4_false_positive' },
+    });
   });
 
   it('班长可强制转交占用任务且操作进入审计', async () => {

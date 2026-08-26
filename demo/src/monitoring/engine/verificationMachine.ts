@@ -69,6 +69,8 @@ export interface VerificationCorrections {
   hazardousMaterialLeak?: boolean;
   queueLengthKm?: number;
   congestionDurationMin?: number;
+  flowVehPerHour?: number;
+  speedKmh?: number;
   notes?: string;
 }
 
@@ -169,6 +171,41 @@ function requireText(value: string | undefined, message: string): string {
   const normalized = value?.trim();
   if (!normalized) throw new VerificationTransitionError('REASON_REQUIRED', message);
   return normalized;
+}
+
+function invalidCorrection(message: string): never {
+  throw new VerificationTransitionError('INVALID_TRANSITION', message);
+}
+
+function validateCorrections(corrections: VerificationCorrections): VerificationCorrections {
+  const integerFields: Array<[string, number | undefined]> = [
+    ['影响车道数', corrections.lanesAffected],
+    ['总车道数', corrections.lanesTotal],
+    ['涉及车辆数', corrections.vehicleCount],
+    ['伤亡人数', corrections.casualties],
+  ];
+  for (const [label, value] of integerFields) {
+    if (value !== undefined && (!Number.isSafeInteger(value) || value < 0)) {
+      invalidCorrection(`${label}必须是非负整数`);
+    }
+  }
+  if (corrections.lanesTotal !== undefined && corrections.lanesTotal <= 0) invalidCorrection('总车道数必须是正整数');
+  if (corrections.lanesAffected !== undefined && corrections.lanesTotal !== undefined
+    && corrections.lanesAffected > corrections.lanesTotal) {
+    invalidCorrection('影响车道数不能大于总车道数');
+  }
+  const numberFields: Array<[string, number | undefined]> = [
+    ['桩号', corrections.location?.kilometer],
+    ['队列长度', corrections.queueLengthKm],
+    ['拥堵持续时间', corrections.congestionDurationMin],
+    ['交通流量', corrections.flowVehPerHour],
+    ['平均速度', corrections.speedKmh],
+  ];
+  for (const [label, value] of numberFields) {
+    if (value !== undefined && (!Number.isFinite(value) || value < 0)) invalidCorrection(`${label}必须是非负有效数值`);
+  }
+  if (corrections.location?.roadCode !== undefined && !corrections.location.roadCode.trim()) invalidCorrection('路线不能为空');
+  return corrections;
 }
 
 function requireApproval(
@@ -407,7 +444,8 @@ export function transitionVerification(input: VerificationTransitionInput): Veri
     });
   }
 
-  const confirmedLevel = command.corrections.confirmedLevel ?? event.confirmedLevel ?? event.suggestedLevel;
+  const corrections = validateCorrections(command.corrections);
+  const confirmedLevel = corrections.confirmedLevel ?? event.confirmedLevel ?? event.suggestedLevel;
   const isDowngrade = LEVEL_WEIGHT[confirmedLevel] < LEVEL_WEIGHT[event.suggestedLevel];
   const reason = isDowngrade
     ? requireText(command.reason, 'L3/L4建议等级被调低时必须填写调整原因')
@@ -416,8 +454,8 @@ export function transitionVerification(input: VerificationTransitionInput): Veri
   if (event.suggestedLevel === 'L4' && isDowngrade) {
     approval = requireApproval(command.supervisorApproval, 'review_l4_downgrade', 'L4事件降级必须经班长复核');
   }
-  const correctedLocation = command.corrections.location
-    ? { ...event.location, ...command.corrections.location }
+  const correctedLocation = corrections.location
+    ? { ...event.location, ...corrections.location }
     : event.location;
   const correction: EventCorrectionVersion = {
     correctionId: `CORR-${idSeed}`,
@@ -431,10 +469,10 @@ export function transitionVerification(input: VerificationTransitionInput): Veri
       location: event.location,
       confirmedLevel: event.confirmedLevel,
     },
-    after: { ...command.corrections, confirmedLevel, location: correctedLocation },
+    after: { ...corrections, confirmedLevel, location: correctedLocation },
   };
   const next = advance(event, currentTask, now, {
-    eventType: command.corrections.eventType ?? event.eventType,
+    eventType: corrections.eventType ?? event.eventType,
     location: correctedLocation,
     confirmedLevel,
     verificationStatus: 'confirmed',

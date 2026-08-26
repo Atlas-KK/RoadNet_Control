@@ -111,6 +111,8 @@ export interface ConfirmedEventFacts {
   hazardousMaterialLeak?: boolean;
   queueLengthKm?: number;
   congestionDurationMin?: number;
+  flowVehPerHour?: number;
+  speedKmh?: number;
   notes?: string;
 }
 
@@ -147,6 +149,8 @@ export interface MonitoringEvent {
   reviewPriorityAt?: string;
   observationCount: number;
   conflicts: readonly FactConflict[];
+  /** 来源侧最新观测事实；人工确认时在其上追加订正，避免接管链路丢失原始结构化事实。 */
+  sourceFacts?: Partial<ConfirmedEventFacts>;
   controlEventId?: string;
   handoffId?: string;
   controlSummary?: ControlDispositionSummary;

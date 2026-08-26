@@ -21,6 +21,10 @@ export interface SimulatedUser {
   authorizedFacilityIds: readonly string[];
 }
 
+const DEMO_MONITORING_FACILITY_IDS = Object.freeze([
+  'TUN-G75-062', 'BR-G50-174', 'TUN-G75-088', 'ROAD-G50-096',
+]);
+
 export const SIMULATED_USERS: readonly SimulatedUser[] = Object.freeze([
   Object.freeze({
     userId: 'USR-MONITOR-01',
@@ -28,7 +32,7 @@ export const SIMULATED_USERS: readonly SimulatedUser[] = Object.freeze([
     role: 'monitor' as const,
     organizationId: 'ORG-SHAANXI',
     authorizedRoadCodes: Object.freeze(['G65', 'G65S', 'G56', 'S204']),
-    authorizedFacilityIds: Object.freeze([]),
+    authorizedFacilityIds: DEMO_MONITORING_FACILITY_IDS,
   }),
   Object.freeze({
     userId: 'USR-SUPERVISOR-01',
@@ -36,7 +40,7 @@ export const SIMULATED_USERS: readonly SimulatedUser[] = Object.freeze([
     role: 'supervisor' as const,
     organizationId: 'ORG-SHAANXI',
     authorizedRoadCodes: Object.freeze(['G65', 'G65S', 'G56', 'S204']),
-    authorizedFacilityIds: Object.freeze([]),
+    authorizedFacilityIds: DEMO_MONITORING_FACILITY_IDS,
   }),
   Object.freeze({
     userId: 'USR-DISPATCHER-01',
@@ -44,7 +48,7 @@ export const SIMULATED_USERS: readonly SimulatedUser[] = Object.freeze([
     role: 'dispatcher' as const,
     organizationId: 'ORG-SHAANXI',
     authorizedRoadCodes: Object.freeze(['G65', 'G65S', 'G56', 'S204']),
-    authorizedFacilityIds: Object.freeze([]),
+    authorizedFacilityIds: DEMO_MONITORING_FACILITY_IDS,
   }),
   Object.freeze({
     userId: 'USR-ADMIN-01',
@@ -52,7 +56,7 @@ export const SIMULATED_USERS: readonly SimulatedUser[] = Object.freeze([
     role: 'administrator' as const,
     organizationId: 'ORG-SHAANXI',
     authorizedRoadCodes: Object.freeze(['G65', 'G65S', 'G56', 'S204']),
-    authorizedFacilityIds: Object.freeze([]),
+    authorizedFacilityIds: DEMO_MONITORING_FACILITY_IDS,
   }),
 ]);
 
