@@ -178,8 +178,13 @@ export default function MonitoringEventDrawer({ item, activeTab, onTabChange, on
           </div>
         </div>
         <div className="monitoring-drawer-actions">
-          <button type="button" className="arco-button" aria-pressed={fullScreen} onClick={() => setFullScreen((value) => !value)}>{fullScreen ? '退出全屏' : '全屏查看'}</button>
-          <button type="button" className="arco-button arco-icon-button" aria-label="关闭详情" onClick={onClose}>×</button>
+          <button type="button" className="arco-button" aria-pressed={fullScreen} onClick={() => setFullScreen((value) => !value)}>
+            <img className="arco-button-icon" src={fullScreen ? '/figma/arco/fullscreen-exit.svg' : '/figma/arco/fullscreen.svg'} alt="" aria-hidden="true" />
+            {fullScreen ? '退出全屏' : '全屏查看'}
+          </button>
+          <button type="button" className="arco-button arco-icon-button" aria-label="关闭详情" onClick={onClose}>
+            <img className="arco-button-icon" src="/figma/arco/close.svg" alt="" aria-hidden="true" />
+          </button>
         </div>
       </header>
 

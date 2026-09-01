@@ -33,6 +33,50 @@ function assertPageValue(name: string, value: number): void {
   if (!Number.isSafeInteger(value) || value <= 0) throw new Error(`${name}必须是正安全整数`);
 }
 
+function namespaceScenarioSchedule(
+  schedule: readonly ScheduledScenarioMessage[],
+  runToken: string,
+): readonly ScheduledScenarioMessage[] {
+  return schedule.map((scheduled) => {
+    const message = scheduled.message;
+    const correlationId = `${message.correlationId}-${runToken}`;
+    const base = {
+      ...message,
+      messageId: `${message.messageId}-${runToken}`,
+      correlationId,
+    };
+    if (message.kind === 'source_alarm') {
+      return {
+        ...scheduled,
+        message: {
+          ...base,
+          kind: 'source_alarm',
+          payload: {
+            ...message.payload,
+            sourceAlarmId: `${message.payload.sourceAlarmId}-${runToken}`,
+            rawPayloadRef: `${message.payload.rawPayloadRef}?run=${runToken}`,
+            evidence: message.payload.evidence.map((item) => ({
+              ...item,
+              evidenceId: `${item.evidenceId}-${runToken}`,
+            })),
+          },
+        },
+      };
+    }
+    if (message.kind === 'source_clear') {
+      return { ...scheduled, message: { ...base, kind: 'source_clear', payload: { ...message.payload, correlationId } } };
+    }
+    return {
+      ...scheduled,
+      message: {
+        ...base,
+        kind: 'evidence_status',
+        payload: { ...message.payload, evidenceId: `${message.payload.evidenceId}-${runToken}` },
+      },
+    };
+  });
+}
+
 export class DemoMonitoringAdapter implements MonitoringSourceAdapter {
   private readonly scheduler: ScenarioScheduler;
   private readonly operationalClock: OperationalClock;
@@ -50,6 +94,7 @@ export class DemoMonitoringAdapter implements MonitoringSourceAdapter {
   private timerHandle?: unknown;
   private timerStartedAtMs = 0;
   private timerRemainingMs = 0;
+  private scenarioRunSequence = 0;
 
   constructor(
     scheduler: ScenarioScheduler = new SystemScenarioScheduler(),
@@ -74,11 +119,13 @@ export class DemoMonitoringAdapter implements MonitoringSourceAdapter {
     this.stopTimer();
     this.activeScenarioId = scenarioId;
     this.seed = seed;
-    this.schedule = buildDemoScenario(scenarioId, seed, !this.failures.has('video_failure'));
+    const runSequence = ++this.scenarioRunSequence;
+    const nextSchedule = buildDemoScenario(scenarioId, seed, !this.failures.has('video_failure'));
+    this.schedule = runSequence === 1
+      ? nextSchedule
+      : namespaceScenarioSchedule(nextSchedule, `R${runSequence}`);
     this.nextIndex = 0;
     this.lastEmittedOffsetMs = 0;
-    this.history = [];
-    this.streamCursor = 0;
     this.playbackState = 'running';
     this.scheduleNext();
   }
@@ -111,6 +158,7 @@ export class DemoMonitoringAdapter implements MonitoringSourceAdapter {
     this.schedule = [];
     this.history = [];
     this.streamCursor = 0;
+    this.scenarioRunSequence = 0;
     this.nextIndex = 0;
     this.lastEmittedOffsetMs = 0;
     this.activeScenarioId = undefined;

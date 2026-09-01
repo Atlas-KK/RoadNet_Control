@@ -11,12 +11,12 @@ interface AppSidebarProps {
 }
 
 const SIDER_ASSETS = {
-  dashboard: '/figma/ant-sider/dashboard.svg',
-  event: '/figma/ant-sider/event.svg',
-  control: '/figma/ant-sider/control.svg',
-  arrowUp: '/figma/ant-sider/arrow-up.svg',
-  arrowDown: '/figma/ant-sider/arrow-down.svg',
-  menuFold: '/figma/ant-sider/menu-fold.svg',
+  dashboard: '/figma/arco/dashboard.svg',
+  event: '/figma/arco/event.svg',
+  control: '/figma/arco/control.svg',
+  arrowUp: '/figma/arco/caret-up.svg',
+  arrowDown: '/figma/arco/caret-down.svg',
+  menuFold: '/figma/arco/menu-fold.svg',
 } as const;
 
 function NavIcon({ src }: { src: string }) {

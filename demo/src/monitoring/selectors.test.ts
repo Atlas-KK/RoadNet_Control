@@ -39,7 +39,7 @@ describe('FR-EM-004 列表投影、筛选和排序', () => {
     event('ME-PENDING', ['A-PENDING'], { detectedAt: time(10) }),
     event('ME-L4', ['A-L4'], { eventType: 'fire', suggestedLevel: 'L4', verificationStatus: 'confirmed', detectedAt: time(9), confirmedAt: time(10) }),
     event('ME-OVERDUE', ['A-OVERDUE'], { verificationStatus: 'verifying', nextReviewAt: time(7), detectedAt: time(7) }),
-    event('ME-OUT', ['A-OUT'], { eventType: 'fire', suggestedLevel: 'L4', location: { roadCode: 'G50', direction: 'up', kilometer: 20 } }),
+    event('ME-OUT', ['A-OUT'], { eventType: 'fire', suggestedLevel: 'L4', location: { roadCode: 'G99', direction: 'up', kilometer: 20 } }),
   ];
 
   it('默认顺序为超时、严重等级、待核实、检测时间倒序，并过滤越权事件', () => {
@@ -68,7 +68,7 @@ describe('FR-EM-004 列表投影、筛选和排序', () => {
 
   it('筛选项只从已有道路和设备去重生成', () => {
     expect(monitoringFilterOptionValues(events, alarms)).toEqual({
-      roadCodes: ['G50', 'G65'], deviceIds: ['CAM-FIRE', 'CAM-OUT', 'CAM-OVERDUE', 'CAM-PENDING'],
+      roadCodes: ['G65', 'G99'], deviceIds: ['CAM-FIRE', 'CAM-OUT', 'CAM-OVERDUE', 'CAM-PENDING'],
     });
   });
 });

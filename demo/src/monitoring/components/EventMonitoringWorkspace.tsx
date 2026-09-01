@@ -6,6 +6,7 @@ import { monitoringFilterOptionValues, buildMonitoringListItems } from '../selec
 import { SystemOperationalClock } from '../services/operationalClock';
 import { selectCurrentSimulatedUser, useMonitoringStore } from '../store';
 import { DEFAULT_MONITORING_FILTERS, useMonitoringUiStore } from '../uiState';
+import { isDefaultMonitoringEventId } from '../adapters/defaultMonitoringEvents';
 import MonitoringEventDrawer from './MonitoringEventDrawer';
 import MonitoringFilterBar from './MonitoringFilterBar';
 import MonitoringOverview from './MonitoringOverview';
@@ -33,6 +34,7 @@ export default function EventMonitoringWorkspace({ onOpenIntelligentControl }: E
   const selectedEventId = useMonitoringUiStore((state) => state.selectedMonitoringEventId);
   const gridScrollOffset = useMonitoringUiStore((state) => state.gridScrollOffset);
   const drawerTab = useMonitoringUiStore((state) => state.drawerTab);
+  const demoDatasetScope = useMonitoringUiStore((state) => state.demoDatasetScope);
   const setFilters = useMonitoringUiStore((state) => state.setFilters);
   const resetFilters = useMonitoringUiStore((state) => state.resetFilters);
   const setSort = useMonitoringUiStore((state) => state.setSort);
@@ -41,7 +43,10 @@ export default function EventMonitoringWorkspace({ onOpenIntelligentControl }: E
   const setDrawerTab = useMonitoringUiStore((state) => state.setDrawerTab);
 
   const alarms = useMemo(() => Object.values(alarmsById), [alarmsById]);
-  const events = useMemo(() => Object.values(eventsById).filter((event) => isActiveMonitoringLifecycle(event.lifecycleStatus)), [eventsById]);
+  const events = useMemo(() => Object.values(eventsById).filter((event) => (
+    isActiveMonitoringLifecycle(event.lifecycleStatus)
+      && (demoDatasetScope === 'all' || isDefaultMonitoringEventId(event.monitoringEventId))
+  )), [demoDatasetScope, eventsById]);
   const handoffs = useMemo(() => Object.values(handoffsById), [handoffsById]);
   const authorizedEvents = useMemo(() => events.filter((event) => canAccessMonitoringEvent(currentUser, event)), [currentUser, events]);
   const authorizedAlarmIds = useMemo(() => new Set(authorizedEvents.flatMap((event) => event.alarmIds)), [authorizedEvents]);
@@ -65,8 +70,9 @@ export default function EventMonitoringWorkspace({ onOpenIntelligentControl }: E
           activeMetric={filters.quickMetric}
           metricKeys={EVENT_TASK_METRICS}
           title="待办状态"
-          description="仅展示当前事件闭环所需状态，点击后同步事件筛选"
+          description=""
           compact
+          hideHeading
           onMetricClick={applyMetric}
         />
         <MonitoringFilterBar filters={filters} sort={sort} roadCodes={filterOptions.roadCodes} deviceIds={filterOptions.deviceIds} resultCount={items.length} onFiltersChange={setFilters} onSortChange={setSort} onReset={resetFilters} />

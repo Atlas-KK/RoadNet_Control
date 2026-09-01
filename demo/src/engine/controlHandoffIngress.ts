@@ -1,9 +1,9 @@
 import type { HandoffRequest } from '../domain/handoff';
 import type { PlanningGap, Plan, PlanMeasure } from '../domain/plan';
-import type { RoadId } from '../data/network';
+import { ROAD_IDS, type RoadId } from '../data/network';
 import type { RuntimeEventInput } from './ingest';
 
-export const SUPPORTED_CONTROL_ROADS = new Set<RoadId>(['G65', 'G65S', 'G56', 'S204']);
+export const SUPPORTED_CONTROL_ROADS = new Set<RoadId>(ROAD_IDS);
 
 export const MONITORING_TYPE_NODE: Readonly<Record<string, string>> = {
   traffic_congestion: 'E_拥堵',

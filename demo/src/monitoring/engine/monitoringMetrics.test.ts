@@ -25,7 +25,7 @@ function event(id: string, alarmIds: string[], overrides: Partial<MonitoringEven
 
 describe('FR-EM-001 工作指标时间和数据范围口径', () => {
   it('今日检测按有效Alarm流量计算，其余指标按事件流量或当前存量计算', () => {
-    const alarms = [alarm('A-TODAY', today(8)), alarm('A-OLD', yesterday), alarm('A-OUT', today(9), 'G50')];
+    const alarms = [alarm('A-TODAY', today(8)), alarm('A-OLD', yesterday), alarm('A-OUT', today(9), 'G99')];
     const events = [
       event('ME-PENDING', ['A-TODAY']),
       event('ME-VERIFYING', ['A-OLD'], { verificationStatus: 'verifying' }),
@@ -33,7 +33,7 @@ describe('FR-EM-001 工作指标时间和数据范围口径', () => {
       event('ME-FALSE', [], { verificationStatus: 'false_positive', falsePositiveAt: today(11) }),
       event('ME-OVERDUE', [], { verificationStatus: 'verifying', nextReviewAt: today(7) }),
       event('ME-TAKEN', [], { lifecycleStatus: 'taken_over', takenOverAt: today(9) }),
-      event('ME-OUT', ['A-OUT'], { location: { roadCode: 'G50', direction: 'up', kilometer: 10 } }),
+      event('ME-OUT', ['A-OUT'], { location: { roadCode: 'G99', direction: 'up', kilometer: 10 } }),
     ];
     const metrics = computeMonitoringMetrics(events, alarms, SIMULATED_USERS[0]!, NOW);
     expect(metrics).toEqual({

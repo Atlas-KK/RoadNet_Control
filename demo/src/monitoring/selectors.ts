@@ -75,9 +75,6 @@ function itemMatchesFilters(item: MonitoringListItem, filters: MonitoringFilters
   if (filters.deviceIds.length && !alarms.some((alarm) => alarm.location.deviceId && filters.deviceIds.includes(alarm.location.deviceId))) return false;
   if (filters.minimumConfidence !== undefined && (item.eventConfidence ?? -1) < filters.minimumConfidence) return false;
   if (!dateAtOrAfter(event.detectedAt, filters.detectedFrom) || !dateAtOrBefore(event.detectedAt, filters.detectedTo)) return false;
-  if (filters.overdueOnly && !item.overdue) return false;
-  if (filters.conflictsOnly && !item.hasConflict) return false;
-  if (filters.takenOverOnly && !item.takenOver) return false;
   const keyword = filters.keyword.trim().toLocaleLowerCase();
   if (keyword) {
     const haystack = [

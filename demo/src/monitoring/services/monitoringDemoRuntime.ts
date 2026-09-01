@@ -2,6 +2,7 @@
 import type { StoreApi, UseBoundStore } from 'zustand';
 import type { ConfirmedEventFacts, EventLocation, MonitoringEventType } from '../../domain/monitoring';
 import { DemoMonitoringAdapter } from '../adapters/DemoMonitoringAdapter';
+import { buildDefaultMonitoringMessages } from '../adapters/defaultMonitoringEvents';
 import type {
   DemoAdapterSnapshot,
   DemoScenarioMetadata,
@@ -63,6 +64,7 @@ export class MonitoringDemoRuntime {
   private pendingCount = 0;
   private lastError?: string;
   private manualSequence = 0;
+  private defaultDatasetSuppressed = false;
   private readonly adapter: MonitoringSourceAdapter & {
     getSnapshot(): DemoAdapterSnapshot;
     listScenarios(): readonly DemoScenarioMetadata[];
@@ -113,14 +115,29 @@ export class MonitoringDemoRuntime {
   }
 
   async startScenario(scenarioId: string, seed: number): Promise<void> {
-    const state = this.store.getState();
-    if (Object.keys(state.monitoringEventsById).length > 0 || state.streamCursor > 0) {
-      throw new Error('开始新场景前必须先清空事件监测演示数据');
-    }
     this.lastError = undefined;
     await this.connect();
     await this.adapter.startScenario(scenarioId, seed);
     this.notifySoon();
+  }
+
+  async bootstrapDefaultEvents(force = false): Promise<number> {
+    await this.connect();
+    if (!force && this.defaultDatasetSuppressed) return 0;
+
+    this.defaultDatasetSuppressed = false;
+    let created = 0;
+    for (const message of buildDefaultMonitoringMessages(this.nowMs())) {
+      const result = await this.enqueueAndWait(message);
+      if (result.status === 'created') created += 1;
+    }
+    this.notifySoon();
+    return created;
+  }
+
+  async restoreDefaultEvents(): Promise<number> {
+    this.defaultDatasetSuppressed = false;
+    return this.bootstrapDefaultEvents(true);
   }
 
   pause(): void {
@@ -166,6 +183,7 @@ export class MonitoringDemoRuntime {
     await this.store.getState().resetMonitoringDemoData();
     this.lastError = undefined;
     this.manualSequence = 0;
+    this.defaultDatasetSuppressed = true;
     this.notifySoon();
   }
 

@@ -17,7 +17,7 @@ describe('阶段11 演示运行时控制边界', () => {
     runtime.dispose();
   });
 
-  it('存在已关闭历史事件时也必须先清空，防止新场景游标与旧投影叠加', async () => {
+  it('存在历史事件时允许追加新场景并保留旧投影', async () => {
     const store = createMonitoringStore(new MemoryMonitoringRepository());
     const runtime = new MonitoringDemoRuntime(new DemoMonitoringAdapter(), store);
     const messages = buildDemoScenario('abnormal-stop-repeated', 301).map((scheduled, index) => ({
@@ -26,7 +26,10 @@ describe('阶段11 演示运行时控制边界', () => {
     for (const message of messages) await store.getState().ingestMonitoringMessage(message);
     expect(store.getState().activeEventIds).toHaveLength(0);
     expect(Object.keys(store.getState().monitoringEventsById)).toHaveLength(1);
-    await expect(runtime.startScenario('tunnel-accident-l3', 302)).rejects.toThrow('必须先清空');
+    await expect(runtime.startScenario('tunnel-accident-l3', 302)).resolves.toBeUndefined();
+    expect(Object.keys(store.getState().monitoringEventsById)).toHaveLength(1);
+    expect(runtime.getSnapshot().playbackState).toBe('running');
+    await runtime.reset();
     runtime.dispose();
   });
 });

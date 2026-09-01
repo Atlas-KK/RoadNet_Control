@@ -81,6 +81,19 @@ describe('阶段3 DemoMonitoringAdapter确定性与播放控制', () => {
     expect(first.map((message) => message.streamSequence)).toEqual([1, 2, 3]);
   });
 
+  it('重复加载同一场景追加历史并生成独立事件批次', async () => {
+    const { adapter, scheduler } = adapterWithManualTime();
+    await adapter.connect();
+    await adapter.startScenario('pedestrian-false-positive', 77);
+    scheduler.flushAll();
+    await adapter.startScenario('pedestrian-false-positive', 77);
+    scheduler.flushAll();
+
+    const messages = await adapter.pullAfter(0);
+    expect(messages.map((message) => message.streamSequence)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(new Set(messages.map((message) => message.correlationId)).size).toBe(2);
+    expect((await adapter.queryEvents({ page: 1, pageSize: 10 })).total).toBe(2);
+  });
   it('暂停场景不暂停operationalTime，恢复后从剩余延迟继续', async () => {
     const { adapter, scheduler, advanceOperationalTime } = adapterWithManualTime();
     await adapter.connect();

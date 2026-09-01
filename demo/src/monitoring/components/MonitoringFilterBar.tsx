@@ -27,7 +27,7 @@ function activeFilterCount(filters: MonitoringFilters): number {
     + filters.eventTypes.length + filters.verificationStatuses.length + filters.levels.length
     + filters.roadCodes.length + filters.directions.length + filters.deviceIds.length
     + Number(filters.minimumConfidence !== undefined) + Number(Boolean(filters.detectedFrom)) + Number(Boolean(filters.detectedTo))
-    + Number(filters.overdueOnly) + Number(filters.conflictsOnly) + Number(filters.takenOverOnly) + Number(Boolean(filters.keyword.trim()));
+    + Number(Boolean(filters.keyword.trim()));
 }
 
 export default function MonitoringFilterBar(props: MonitoringFilterBarProps) {
@@ -35,20 +35,10 @@ export default function MonitoringFilterBar(props: MonitoringFilterBarProps) {
   const filterCount = activeFilterCount(filters);
   return (
     <section className="monitoring-filter-bar arco-card" aria-label="视频事件筛选" data-testid="monitoring-filter-bar">
-      <header className="monitoring-section-heading monitoring-filter-heading">
-        <div><h2>事件筛选</h2><p>按事件属性、位置与核实状态组合查询</p></div>
-        <span className="arco-tag">共 {props.resultCount} 起</span>
-      </header>
+      <div className="monitoring-filter-toolbar">
+        <h2>事件筛选</h2>
+      </div>
       <div className="monitoring-filter-primary">
-        <label className="monitoring-search-field">
-          <span className="sr-only">关键词</span>
-          <input
-            className="arco-input"
-            value={filters.keyword}
-            placeholder="搜索事件编号、道路、设施或摄像机"
-            onChange={(event) => props.onFiltersChange({ keyword: event.currentTarget.value })}
-          />
-        </label>
         <label>
           <span>事件类型</span>
           <select className="arco-input" value={filters.eventTypes[0] ?? ''} onChange={(event) => props.onFiltersChange({ eventTypes: singleValue<MonitoringEventType>(event.currentTarget.value) })}>
@@ -88,16 +78,28 @@ export default function MonitoringFilterBar(props: MonitoringFilterBarProps) {
       </div>
 
       <details className="monitoring-advanced-filters">
-        <summary>更多筛选{filterCount ? `（已启用 ${filterCount} 项）` : ''}</summary>
+        <summary>
+          <img className="monitoring-summary-filter-icon" src="/figma/arco/filter.svg" alt="" aria-hidden="true" />
+          <span>更多筛选{filterCount ? `（已启用 ${filterCount} 项）` : ''}</span>
+          <img className="monitoring-summary-caret is-down" src="/figma/arco/caret-down.svg" alt="" aria-hidden="true" />
+          <img className="monitoring-summary-caret is-up" src="/figma/arco/caret-up.svg" alt="" aria-hidden="true" />
+        </summary>
         <div className="monitoring-filter-secondary">
+          <label className="monitoring-search-field">
+            <span className="sr-only">关键词</span>
+            <img className="monitoring-search-icon" src="/figma/arco/search.svg" alt="" aria-hidden="true" />
+            <input
+              className="arco-input"
+              value={filters.keyword}
+              placeholder="搜索事件编号、道路、设施或摄像机"
+              onChange={(event) => props.onFiltersChange({ keyword: event.currentTarget.value })}
+            />
+          </label>
           <label><span>方向</span><select className="arco-input" value={filters.directions[0] ?? ''} onChange={(event) => props.onFiltersChange({ directions: singleValue<TravelDirection>(event.currentTarget.value) })}><option value="">全部方向</option><option value="up">上行</option><option value="down">下行</option><option value="unknown">方向未知</option></select></label>
           <label><span>摄像机</span><select className="arco-input" value={filters.deviceIds[0] ?? ''} onChange={(event) => props.onFiltersChange({ deviceIds: singleValue(event.currentTarget.value) })}><option value="">全部设备</option>{props.deviceIds.map((deviceId) => <option key={deviceId} value={deviceId}>{deviceId}</option>)}</select></label>
           <label><span>最低AI置信度</span><select className="arco-input" value={filters.minimumConfidence ?? ''} onChange={(event) => props.onFiltersChange({ minimumConfidence: event.currentTarget.value ? Number(event.currentTarget.value) : undefined })}><option value="">不限</option><option value="0.6">60%</option><option value="0.75">75%</option><option value="0.9">90%</option></select></label>
           <label><span>检测起始</span><input className="arco-input" type="datetime-local" value={filters.detectedFrom ?? ''} onChange={(event) => props.onFiltersChange({ detectedFrom: event.currentTarget.value || undefined })} /></label>
           <label><span>检测结束</span><input className="arco-input" type="datetime-local" value={filters.detectedTo ?? ''} onChange={(event) => props.onFiltersChange({ detectedTo: event.currentTarget.value || undefined })} /></label>
-          <label className="monitoring-check"><input type="checkbox" checked={filters.overdueOnly} onChange={(event) => props.onFiltersChange({ overdueOnly: event.currentTarget.checked })} />仅看核实超时</label>
-          <label className="monitoring-check"><input type="checkbox" checked={filters.conflictsOnly} onChange={(event) => props.onFiltersChange({ conflictsOnly: event.currentTarget.checked })} />仅看事实冲突</label>
-          <label className="monitoring-check"><input type="checkbox" checked={filters.takenOverOnly} onChange={(event) => props.onFiltersChange({ takenOverOnly: event.currentTarget.checked })} />仅看已接管</label>
         </div>
       </details>
 

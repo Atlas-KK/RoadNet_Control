@@ -154,12 +154,9 @@ export default function CalcPanel({ records, highlightIds, embedded = false }: P
   const firstHl = highlightIds && highlightIds.length > 0 ? highlightIds[0] : undefined;
   const chart = useStore((s) => s.chart);
   const eventIds = useMemo(() => Array.from(new Set(records.map((r) => r.eventId))), [records]);
-  const filteredRecords = eventFilter === 'ALL' ? records : records.filter((r) => r.eventId === eventFilter);
+  const effectiveEventFilter = eventFilter === 'ALL' || eventIds.includes(eventFilter) ? eventFilter : 'ALL';
+  const filteredRecords = effectiveEventFilter === 'ALL' ? records : records.filter((r) => r.eventId === effectiveEventFilter);
   const showEventFilter = !embedded || eventIds.length > 1;
-
-  useEffect(() => {
-    if (eventFilter !== 'ALL' && !eventIds.includes(eventFilter)) setEventFilter('ALL');
-  }, [eventFilter, eventIds]);
 
   // 联动：首条关联计算滚入视野
   useEffect(() => {
@@ -176,7 +173,7 @@ export default function CalcPanel({ records, highlightIds, embedded = false }: P
           {showEventFilter ? (
             <select
               aria-label="按事件过滤"
-              value={eventFilter}
+              value={effectiveEventFilter}
               onChange={(e) => setEventFilter(e.target.value)}
               className="max-w-28 rounded border border-[var(--color-line)] bg-[var(--color-panel)] px-1.5 py-0.5 text-[10px] font-normal text-[var(--color-ink)]"
             >

@@ -1,7 +1,6 @@
 import type { SimEvent } from '../domain/event';
 import type { Plan } from '../domain/plan';
-import type { RoadId } from '../data/network';
-import { tunnelAt } from '../data/network';
+import { ROAD_IDS, tunnelAt, type RoadId } from '../data/network';
 import { tracePathForStep, type CalcRecord, type TraceStep } from '../engine/trace';
 import type { RuntimeEventInput } from '../engine/ingest';
 import type { RadarFusionTraffic } from '../gis/radarFusionTraffic';
@@ -107,16 +106,32 @@ export const QWEN_LLM_PRESET: Pick<LlmConfig, 'baseUrl' | 'model' | 'provider'> 
 
 const LLM_CONFIG_KEY = 'roadgov-mvp:llm';
 const LLM_API_KEY_SESSION_KEY = 'roadgov-mvp:llm-api-key';
-const LLM_ENV_KEYS = {
-  baseUrl: 'VITE_LLM_BASE_URL',
-  apiKey: 'VITE_LLM_API_KEY',
-  qwenApiKey: 'VITE_LLM_QWEN_API_KEY',
-  deepseekApiKey: 'VITE_LLM_DEEPSEEK_API_KEY',
-  kimiApiKey: 'VITE_LLM_KIMI_API_KEY',
-  model: 'VITE_LLM_MODEL',
-  timeoutMs: 'VITE_LLM_TIMEOUT_MS',
-  provider: 'VITE_LLM_PROVIDER',
-} as const;
+interface DevelopmentLlmEnvironment {
+  baseUrl?: string;
+  apiKey?: string;
+  qwenApiKey?: string;
+  deepseekApiKey?: string;
+  kimiApiKey?: string;
+  model?: string;
+  timeoutMs?: string;
+  provider?: string;
+}
+
+// VITE_* 会被编译进浏览器包。仅开发模式读取本机演示密钥，生产构建必须落到空对象，
+// 由构建后的密钥扫描验证实际产物不包含任何配置值。
+function readDevelopmentLlmEnvironment(): DevelopmentLlmEnvironment {
+  if (!import.meta.env.DEV) return {};
+  return {
+    baseUrl: import.meta.env.VITE_LLM_BASE_URL,
+    apiKey: import.meta.env.VITE_LLM_API_KEY,
+    qwenApiKey: import.meta.env.VITE_LLM_QWEN_API_KEY,
+    deepseekApiKey: import.meta.env.VITE_LLM_DEEPSEEK_API_KEY,
+    kimiApiKey: import.meta.env.VITE_LLM_KIMI_API_KEY,
+    model: import.meta.env.VITE_LLM_MODEL,
+    timeoutMs: import.meta.env.VITE_LLM_TIMEOUT_MS,
+    provider: import.meta.env.VITE_LLM_PROVIDER,
+  };
+}
 
 interface StoredLlmConfig {
   baseUrl?: unknown;
@@ -139,32 +154,33 @@ export function getLlmProviderPreset(provider: Exclude<LlmProvider, 'custom'>): 
   return { baseUrl: preset.baseUrl, model: preset.model, provider };
 }
 
-function readEnvString(name: string): string | undefined {
-  const value = import.meta.env[name];
+function readEnvString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
 }
 
 function readEnvProvider(): LlmConfig['provider'] | undefined {
-  const provider = readEnvString(LLM_ENV_KEYS.provider);
+  const provider = readEnvString(readDevelopmentLlmEnvironment().provider);
   return isLlmProvider(provider) ? provider : undefined;
 }
 
 export function readConfiguredLlmApiKey(provider?: LlmProvider): string | undefined {
-  if (provider === 'qwen') return readEnvString(LLM_ENV_KEYS.qwenApiKey) ?? readEnvString(LLM_ENV_KEYS.apiKey);
-  if (provider === 'deepseek') return readEnvString(LLM_ENV_KEYS.deepseekApiKey) ?? readEnvString(LLM_ENV_KEYS.apiKey);
-  if (provider === 'kimi') return readEnvString(LLM_ENV_KEYS.kimiApiKey) ?? readEnvString(LLM_ENV_KEYS.apiKey);
-  return readEnvString(LLM_ENV_KEYS.apiKey);
+  const environment = readDevelopmentLlmEnvironment();
+  if (provider === 'qwen') return readEnvString(environment.qwenApiKey) ?? readEnvString(environment.apiKey);
+  if (provider === 'deepseek') return readEnvString(environment.deepseekApiKey) ?? readEnvString(environment.apiKey);
+  if (provider === 'kimi') return readEnvString(environment.kimiApiKey) ?? readEnvString(environment.apiKey);
+  return readEnvString(environment.apiKey);
 }
 
 function readEnvLlmConfig(): Partial<LlmConfig> {
-  const timeoutText = readEnvString(LLM_ENV_KEYS.timeoutMs);
+  const environment = readDevelopmentLlmEnvironment();
+  const timeoutText = readEnvString(environment.timeoutMs);
   const timeoutMs = timeoutText == null ? undefined : Number(timeoutText);
   const provider = readEnvProvider();
   const preset = provider && provider !== 'custom' ? LLM_PROVIDER_PRESETS[provider] : undefined;
   return {
-    baseUrl: readEnvString(LLM_ENV_KEYS.baseUrl) ?? preset?.baseUrl,
+    baseUrl: readEnvString(environment.baseUrl) ?? preset?.baseUrl,
     apiKey: readConfiguredLlmApiKey(provider),
-    model: readEnvString(LLM_ENV_KEYS.model) ?? preset?.model,
+    model: readEnvString(environment.model) ?? preset?.model,
     timeoutMs: timeoutMs != null && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : undefined,
     provider,
   };
@@ -479,7 +495,6 @@ export function validateDraftSchema(value: unknown): ValidationResult {
   return { ok: reasons.length === 0, reasons };
 }
 
-const ROAD_IDS: RoadId[] = ['G65', 'G65S', 'G56', 'S204'];
 const EVENT_TYPE_IDS = ['E_追尾', 'E_侧翻', 'E_抛锚', 'E_危化泄漏'] as const;
 const EVENT_DIRECTIONS = ['up', 'down', 'unknown'] as const;
 

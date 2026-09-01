@@ -15,6 +15,8 @@ describe('FR-EM-005 / FR-EM-006 宽幅事件核实详情', () => {
     const html = renderTab('video');
     for (const label of ['视频核实', '关联告警', '事件信息', '核实记录', '关联处置']) expect(html).toContain(label);
     expect(html).toContain('全屏查看');
+    expect(html).toContain('/figma/arco/fullscreen.svg');
+    expect(html).toContain('/figma/arco/close.svg');
     expect(html).toContain('打开详情不占用');
     expect(html).toContain('开始核实');
     expect(html).toContain('点击后才创建独占核实任务');

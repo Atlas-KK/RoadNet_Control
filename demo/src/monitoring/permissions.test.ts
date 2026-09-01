@@ -48,8 +48,8 @@ describe('FR-EM-012 权限矩阵', () => {
   });
 
   it('状态层拒绝访问授权范围外事件', () => {
-    expect(canAccessMonitoringEvent(monitor, event('G30'))).toBe(false);
-    expect(() => assertMonitoringPermission(monitor, 'verify_event', event('G30')))
+    expect(canAccessMonitoringEvent(monitor, event('G99'))).toBe(false);
+    expect(() => assertMonitoringPermission(monitor, 'verify_event', event('G99')))
       .toThrow(MonitoringPermissionError);
   });
 });

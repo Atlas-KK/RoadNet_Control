@@ -102,7 +102,11 @@ export default function TracePanel({ embedded = false, onOpenDetail }: { embedde
   const focusedEventId = useStore((s) => s.focusedEventId);
   const [showAll, setShowAll] = useState(false);
 
-  useEffect(() => { setShowAll(false); }, [focusedEventId]);
+  useEffect(() => {
+    // 聚焦新事件时恢复“仅看当前事件”，避免沿用上一事件的全量轨迹开关。
+    // oxlint-disable-next-line react/set-state-in-effect
+    setShowAll(false);
+  }, [focusedEventId]);
 
   const visibleTrace = focusedEventId && !showAll
     ? trace.filter((step) => step.eventId === focusedEventId)

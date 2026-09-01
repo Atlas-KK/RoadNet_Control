@@ -37,10 +37,12 @@ describe('FR-EM-001 / FR-EM-011 监测UI会话状态', () => {
     const restored = readMonitoringUiState(storage);
     expect(restored.filters.roadCodes).toEqual(['G65']);
     expect(restored.filters.keyword).toBe('隧道');
+    expect(restored.filters).not.toHaveProperty('overdueOnly');
     expect(restored.selectedMonitoringEventId).toBe('ME-001');
     expect(restored.gridScrollOffset).toBe(320);
     expect(restored.mapViewport).toEqual({ center: [108.9, 34.2], zoom: 10 });
     expect(restored.drawerTab).toBe('control');
+    expect(restored.demoDatasetScope).toBe('all');
   });
 
   it('UI Store每次变更写入sessionStorage', () => {
@@ -49,10 +51,12 @@ describe('FR-EM-001 / FR-EM-011 监测UI会话状态', () => {
     store.getState().setFilters({ roadCodes: ['G65'], keyword: '火灾' });
     store.getState().setGridScrollOffset(180);
     store.getState().setSelectedMonitoringEventId('ME-002');
+    store.getState().setDemoDatasetScope('all');
     const persisted = JSON.parse(values.get(MONITORING_UI_SESSION_KEY) ?? '{}') as Record<string, unknown>;
     expect((persisted.filters as { keyword: string }).keyword).toBe('火灾');
     expect(persisted.gridScrollOffset).toBe(180);
     expect(persisted.selectedMonitoringEventId).toBe('ME-002');
+    expect(persisted.demoDatasetScope).toBe('all');
   });
 
   it('损坏数据回退默认状态', () => {
@@ -61,5 +65,6 @@ describe('FR-EM-001 / FR-EM-011 监测UI会话状态', () => {
     expect(restored.activeView).toBe('video_monitoring');
     expect(restored.filters.keyword).toBe('');
     expect(restored.gridScrollOffset).toBe(0);
+    expect(restored.demoDatasetScope).toBe('all');
   });
 });

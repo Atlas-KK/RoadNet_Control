@@ -10,7 +10,7 @@ describe('监测场景与人工补报入口', () => {
     expect(html).toContain('本地演示工具');
     expect(html).toContain('模拟操作身份');
     for (const text of ['异常停车重复告警', '行人误报', '抛洒物持续观察', '隧道交通事故L3', '隧道火灾L4', '交通拥堵持续监测']) expect(html).toContain(text);
-    for (const text of ['本地模拟', '加载场景', '人工补报', '清空监测数据']) expect(html).toContain(text);
+    for (const text of ['本地模拟', '加载场景', '人工补报', '恢复默认数据', '清空监测数据']) expect(html).toContain(text);
     for (const text of ['故障演练', '故障模拟', '模拟断线', '模拟视频失败', '恢复并补拉', '恢复视频']) expect(html).not.toContain(text);
   });
 });

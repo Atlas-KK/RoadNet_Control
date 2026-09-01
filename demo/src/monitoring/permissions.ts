@@ -1,4 +1,5 @@
 import type { MonitoringEvent } from '../domain/monitoring';
+import { DEFAULT_MONITORING_ROAD_CODES } from './adapters/defaultMonitoringEvents';
 
 export type MonitoringRole = 'monitor' | 'supervisor' | 'dispatcher' | 'administrator';
 export type MonitoringPermission =
@@ -25,13 +26,20 @@ const DEMO_MONITORING_FACILITY_IDS = Object.freeze([
   'TUN-G75-062', 'BR-G50-174', 'TUN-G75-088', 'ROAD-G50-096',
 ]);
 
+// 本地演示数据需要对全部模拟角色可见；角色差异仍由操作权限矩阵控制。
+export const DEMO_MONITORING_ROAD_CODES = Object.freeze([
+  'G65', 'G65S', 'G56', 'S204',
+  ...DEFAULT_MONITORING_ROAD_CODES,
+  'G75', 'G50',
+].filter((roadCode, index, roadCodes) => roadCodes.indexOf(roadCode) === index));
+
 export const SIMULATED_USERS: readonly SimulatedUser[] = Object.freeze([
   Object.freeze({
     userId: 'USR-MONITOR-01',
     displayName: '路网监测员',
     role: 'monitor' as const,
     organizationId: 'ORG-SHAANXI',
-    authorizedRoadCodes: Object.freeze(['G65', 'G65S', 'G56', 'S204']),
+    authorizedRoadCodes: DEMO_MONITORING_ROAD_CODES,
     authorizedFacilityIds: DEMO_MONITORING_FACILITY_IDS,
   }),
   Object.freeze({
@@ -39,7 +47,7 @@ export const SIMULATED_USERS: readonly SimulatedUser[] = Object.freeze([
     displayName: '监控班长',
     role: 'supervisor' as const,
     organizationId: 'ORG-SHAANXI',
-    authorizedRoadCodes: Object.freeze(['G65', 'G65S', 'G56', 'S204']),
+    authorizedRoadCodes: DEMO_MONITORING_ROAD_CODES,
     authorizedFacilityIds: DEMO_MONITORING_FACILITY_IDS,
   }),
   Object.freeze({
@@ -47,7 +55,7 @@ export const SIMULATED_USERS: readonly SimulatedUser[] = Object.freeze([
     displayName: '指挥调度人员',
     role: 'dispatcher' as const,
     organizationId: 'ORG-SHAANXI',
-    authorizedRoadCodes: Object.freeze(['G65', 'G65S', 'G56', 'S204']),
+    authorizedRoadCodes: DEMO_MONITORING_ROAD_CODES,
     authorizedFacilityIds: DEMO_MONITORING_FACILITY_IDS,
   }),
   Object.freeze({
@@ -55,7 +63,7 @@ export const SIMULATED_USERS: readonly SimulatedUser[] = Object.freeze([
     displayName: '系统管理员',
     role: 'administrator' as const,
     organizationId: 'ORG-SHAANXI',
-    authorizedRoadCodes: Object.freeze(['G65', 'G65S', 'G56', 'S204']),
+    authorizedRoadCodes: DEMO_MONITORING_ROAD_CODES,
     authorizedFacilityIds: DEMO_MONITORING_FACILITY_IDS,
   }),
 ]);

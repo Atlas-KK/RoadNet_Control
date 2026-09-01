@@ -4,6 +4,7 @@ import { MONITORING_EVENT_TYPE_LABELS } from '../selectors';
 import { monitoringDemoRuntime, type ManualMonitoringReportInput } from '../services/monitoringDemoRuntime';
 import { useMonitoringStore } from '../store';
 import SimulatedUserSwitcher from '../../components/SimulatedUserSwitcher';
+import { useMonitoringUiStore } from '../uiState';
 
 function optionalNumber(value: string): number | undefined {
   if (!value.trim()) return undefined;
@@ -67,6 +68,7 @@ function ManualReportDialog({ onClose }: { onClose: () => void }) {
     setError('');
     try {
       await monitoringDemoRuntime.submitManualReport(input);
+      useMonitoringUiStore.getState().setDemoDatasetScope('all');
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : '人工补报接入失败');
@@ -81,7 +83,9 @@ function ManualReportDialog({ onClose }: { onClose: () => void }) {
       <section className="monitoring-modal arco-card">
         <header>
           <div><h2>人工补报</h2><p>补充视频算法尚未覆盖的现场事件</p></div>
-          <button type="button" className="arco-button arco-icon-button" aria-label="关闭人工补报" onClick={onClose}>×</button>
+          <button type="button" className="arco-button arco-icon-button" aria-label="关闭人工补报" onClick={onClose}>
+            <img className="arco-button-icon" src="/figma/arco/close.svg" alt="" aria-hidden="true" />
+          </button>
         </header>
         <p className="monitoring-demo-boundary">通过与视频AI相同的标准化入口写入模拟数据，不接入生产报警渠道。</p>
         <div className="monitoring-manual-grid">
@@ -118,7 +122,6 @@ export default function MonitoringDemoBar({ open, onClose }: MonitoringDemoBarPr
   const [notice, setNotice] = useState('');
   const [manualOpen, setManualOpen] = useState(false);
   const activeCount = useMonitoringStore((state) => state.activeEventIds.length);
-  const storedEventCount = useMonitoringStore((state) => Object.keys(state.monitoringEventsById).length);
   const connectionState = useMonitoringStore((state) => state.connectionState);
 
   useEffect(() => monitoringDemoRuntime.subscribe(() => setSnapshot(monitoringDemoRuntime.getSnapshot())), []);
@@ -129,21 +132,29 @@ export default function MonitoringDemoBar({ open, onClose }: MonitoringDemoBarPr
       setNotice('seed必须是非负整数');
       return;
     }
-    if (storedEventCount > 0) {
-      if (!window.confirm('加载新监测场景将清空事件监测演示数据，但不会影响智能管控。是否继续？')) return;
-      await monitoringDemoRuntime.reset();
-    }
     try {
       await monitoringDemoRuntime.startScenario(scenarioId, parsedSeed);
-      setNotice('场景已启动；消息按脚本时间持续推送');
+      useMonitoringUiStore.getState().setDemoDatasetScope('all');
+      setNotice('场景已追加；消息按脚本时间持续推送');
     } catch (cause) {
       setNotice(cause instanceof Error ? cause.message : '场景启动失败');
+    }
+  };
+
+  const restoreDefaults = async () => {
+    try {
+      const created = await monitoringDemoRuntime.restoreDefaultEvents();
+      useMonitoringUiStore.getState().setDemoDatasetScope('default');
+      setNotice(created > 0 ? `已恢复 ${created} 条默认事件` : '默认事件已存在');
+    } catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : '恢复默认事件失败');
     }
   };
 
   const reset = async () => {
     if (!window.confirm('清空事件监测演示数据？该操作不影响智能管控。')) return;
     await monitoringDemoRuntime.reset();
+    useMonitoringUiStore.getState().setDemoDatasetScope('default');
     setNotice('事件监测演示数据已清空');
   };
 
@@ -156,7 +167,7 @@ export default function MonitoringDemoBar({ open, onClose }: MonitoringDemoBarPr
       <aside className="monitoring-demo-bar arco-card" role="dialog" aria-modal="true" aria-label="本地演示工具">
         <header className="monitoring-section-heading monitoring-demo-heading">
           <div><h2>本地演示工具</h2><p>场景构造与人工补报，不接入生产报警与视频渠道</p></div>
-          <div className="monitoring-demo-heading-actions"><span className="arco-tag monitoring-demo-tag">本地模拟</span><button type="button" className="arco-button arco-icon-button" aria-label="关闭本地演示工具" onClick={onClose}>×</button></div>
+          <div className="monitoring-demo-heading-actions"><span className="arco-tag monitoring-demo-tag">本地模拟</span><button type="button" className="arco-button arco-icon-button" aria-label="关闭本地演示工具" onClick={onClose}><img className="arco-button-icon" src="/figma/arco/close.svg" alt="" aria-hidden="true" /></button></div>
         </header>
         <div className="monitoring-demo-identity"><div><strong>模拟操作身份</strong><span>用于验证机构权限和角色差异</span></div><SimulatedUserSwitcher /></div>
         <div className="monitoring-demo-controls">
@@ -166,6 +177,7 @@ export default function MonitoringDemoBar({ open, onClose }: MonitoringDemoBarPr
         {snapshot.playbackState === 'running' ? <button type="button" className="arco-button arco-button-size-mini" onClick={() => monitoringDemoRuntime.pause()}>暂停</button> : undefined}
         {snapshot.playbackState === 'paused' ? <button type="button" className="arco-button arco-button-size-mini" onClick={() => monitoringDemoRuntime.resume()}>继续</button> : undefined}
         <button type="button" className="arco-button arco-button-size-mini" onClick={() => setManualOpen(true)}>人工补报</button>
+        <button type="button" className="arco-button arco-button-size-mini" onClick={() => void restoreDefaults()}>恢复默认数据</button>
         <button type="button" className="arco-button arco-button-danger arco-button-size-mini" onClick={() => void reset()}>清空监测数据</button>
       </div>
       <div className="monitoring-demo-status" role="status">

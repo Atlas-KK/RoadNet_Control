@@ -3,7 +3,9 @@
 // 具体 GIS 几何集中在 gis/xiAnRing.ts，避免同时维护两套路网定义。
 // ============================================================
 
-export type RoadId = 'G65' | 'G65S' | 'G56' | 'S204';
+/** 智能管控运行域支持的道路；类型、表单白名单和接管校验必须共用这一事实源。 */
+export const ROAD_IDS = ['G65', 'G65S', 'G56', 'S204'] as const;
+export type RoadId = (typeof ROAD_IDS)[number];
 
 /** 计算路网上两点沿路的距离（km，绝对值）——同路适用 */
 export function segDistance(kpA: number, kpB: number): number {

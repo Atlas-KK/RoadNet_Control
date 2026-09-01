@@ -6,6 +6,7 @@ import type { MonitoringMetricKey } from './engine/monitoringMetrics';
 export type MonitoringView = 'video_monitoring' | 'gis_awareness';
 export type MonitoringDrawerTab = 'video' | 'alarms' | 'event' | 'verification_history' | 'control';
 export type MonitoringSort = 'default_priority' | 'detected_desc' | 'level_desc';
+export type MonitoringDemoDatasetScope = 'default' | 'all';
 
 export interface MonitoringFilters {
   quickMetric?: MonitoringMetricKey;
@@ -18,9 +19,6 @@ export interface MonitoringFilters {
   minimumConfidence?: number;
   detectedFrom?: string;
   detectedTo?: string;
-  overdueOnly: boolean;
-  conflictsOnly: boolean;
-  takenOverOnly: boolean;
   keyword: string;
 }
 
@@ -38,6 +36,7 @@ export interface MonitoringUiSnapshot {
   gridScrollOffset: number;
   mapViewport?: MonitoringMapViewport;
   drawerTab: MonitoringDrawerTab;
+  demoDatasetScope: MonitoringDemoDatasetScope;
 }
 
 export interface MonitoringUiState extends MonitoringUiSnapshot {
@@ -49,6 +48,7 @@ export interface MonitoringUiState extends MonitoringUiSnapshot {
   setGridScrollOffset: (offset: number) => void;
   setMapViewport: (viewport?: MonitoringMapViewport) => void;
   setDrawerTab: (tab: MonitoringDrawerTab) => void;
+  setDemoDatasetScope: (scope: MonitoringDemoDatasetScope) => void;
   restore: () => void;
 }
 
@@ -63,9 +63,6 @@ export const DEFAULT_MONITORING_FILTERS: MonitoringFilters = Object.freeze({
   roadCodes: [],
   directions: [],
   deviceIds: [],
-  overdueOnly: false,
-  conflictsOnly: false,
-  takenOverOnly: false,
   keyword: '',
 });
 
@@ -78,6 +75,9 @@ export const DEFAULT_MONITORING_UI_SNAPSHOT: MonitoringUiSnapshot = Object.freez
   gridScrollOffset: 0,
   mapViewport: undefined,
   drawerTab: 'video',
+  // 默认必须展示全部数据；只有开发环境成功补齐标准案例后，App 才切到 default。
+  // 这样生产构建或默认数据加载失败时不会把真实监测事件误判为“非默认案例”而隐藏。
+  demoDatasetScope: 'all',
 });
 
 export function parseMonitoringView(value: unknown): MonitoringView {
@@ -112,9 +112,6 @@ function parseFilters(value: unknown): MonitoringFilters {
     minimumConfidence: typeof value.minimumConfidence === 'number' ? value.minimumConfidence : undefined,
     detectedFrom: typeof value.detectedFrom === 'string' ? value.detectedFrom : undefined,
     detectedTo: typeof value.detectedTo === 'string' ? value.detectedTo : undefined,
-    overdueOnly: value.overdueOnly === true,
-    conflictsOnly: value.conflictsOnly === true,
-    takenOverOnly: value.takenOverOnly === true,
     keyword: typeof value.keyword === 'string' ? value.keyword : '',
   };
 }
@@ -139,6 +136,7 @@ export function parseMonitoringUiSnapshot(value: unknown): MonitoringUiSnapshot 
     drawerTab: value.drawerTab === 'alarms' || value.drawerTab === 'event' || value.drawerTab === 'verification_history' || value.drawerTab === 'control'
       ? value.drawerTab
       : 'video',
+    demoDatasetScope: value.demoDatasetScope === 'default' ? 'default' : 'all',
   };
 }
 
@@ -182,6 +180,7 @@ function snapshotOf(state: MonitoringUiState): MonitoringUiSnapshot {
     gridScrollOffset: state.gridScrollOffset,
     mapViewport: state.mapViewport,
     drawerTab: state.drawerTab,
+    demoDatasetScope: state.demoDatasetScope,
   };
 }
 
@@ -202,6 +201,7 @@ export function createMonitoringUiStore(storage: SessionStorageLike | undefined 
       setGridScrollOffset: (gridScrollOffset) => commit({ gridScrollOffset: Math.max(0, gridScrollOffset) }),
       setMapViewport: (mapViewport) => commit({ mapViewport }),
       setDrawerTab: (drawerTab) => commit({ drawerTab }),
+      setDemoDatasetScope: (demoDatasetScope) => commit({ demoDatasetScope }),
       restore: () => set(readMonitoringUiState(storage)),
     };
   });

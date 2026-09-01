@@ -58,10 +58,6 @@ export default function VideoEventGrid(props: VideoEventGridProps) {
 
   return (
     <section className="video-event-list-shell arco-card" aria-label="实时视频事件列表">
-      <header className="monitoring-section-heading video-event-list-heading">
-        <div><h2>实时事件</h2><p>按默认优先级展示待核实与持续监测事件</p></div>
-        <span className="arco-tag">{visibleItems.length} 起可见</span>
-      </header>
       {deferredVisibleCount > 0 ? (
         <button type="button" className="monitoring-new-events" onClick={revealNewEvents}>新增 {deferredVisibleCount} 起事件，点击查看</button>
       ) : undefined}
@@ -81,7 +77,7 @@ export default function VideoEventGrid(props: VideoEventGridProps) {
           </div>
         ) : (
           <div className="monitoring-empty-state" data-testid="monitoring-empty-state">
-            <span aria-hidden="true">▣</span>
+            <span aria-hidden="true"><img src="/figma/arco/empty.svg" alt="" /></span>
             <strong>暂无符合条件的视频事件</strong>
             <p>可以调整筛选条件，或等待模拟视频算法推送新的检测结果。</p>
             <button type="button" className="arco-button arco-button-outline" onClick={props.onResetFilters}>重置筛选</button>

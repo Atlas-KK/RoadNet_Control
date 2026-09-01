@@ -127,6 +127,8 @@ export default function VerificationPanel({ item, taskOverride, currentUserOverr
   const canTransfer = hasMonitoringPermission(currentUser, 'transfer_task');
 
   useEffect(() => {
+    // 事件或草稿切换属于表单上下文重置，不能沿用上一个事件的本地编辑状态。
+    // oxlint-disable-next-line react/set-state-in-effect
     setEventType(draftResetState.eventType);
     setConfirmedLevel(draftResetState.confirmedLevel);
     setRoadCode(draftResetState.roadCode);
@@ -278,4 +280,3 @@ export default function VerificationPanel({ item, taskOverride, currentUserOverr
     </div>
   );
 }
-

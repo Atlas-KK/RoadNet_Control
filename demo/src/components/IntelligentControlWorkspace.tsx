@@ -22,6 +22,8 @@ export default function IntelligentControlWorkspace() {
   useEffect(() => {
     if (!focusedEventId || !focusedEvent) return;
     const cameraId = nearestCameraId(focusedEvent.road, focusedEvent.accidentKp);
+    // 切换业务事件时需要重置默认摄像机，之后用户仍可手动选择其他机位。
+    // oxlint-disable-next-line react/set-state-in-effect
     if (cameraId) setSelectedCameraId(cameraId);
   }, [focusedEvent, focusedEventId]);
 

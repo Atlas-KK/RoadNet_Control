@@ -61,8 +61,9 @@
   width: 208px;
   min-width: 208px;
   flex-direction: column;
-  background: #ffffff;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+  background: #fff;
+  border-right: 1px solid var(--color-line);
+  box-shadow: 2px 0 8px rgb(29 33 41 / 6%);
   transition: width 180ms ease, min-width 180ms ease;
 }
 
@@ -112,19 +113,19 @@
 .app-nav-item:hover,
 .app-nav-child:hover,
 .app-sidebar-collapse:hover {
-  background: #f5f5f5;
-  color: #1890ff;
+  background: var(--color-canvas);
+  color: var(--color-brand-700);
 }
 
 .app-nav-group[data-active='true'] > .app-nav-parent {
-  color: #1890ff;
+  color: var(--color-brand-700);
 }
 
 .app-nav-item[aria-current='page'],
 .app-nav-child[aria-current='page'] {
-  background: #e6f7ff;
-  color: #1890ff;
-  box-shadow: inset -3px 0 0 #1890ff;
+  background: var(--color-brand-50);
+  color: var(--color-brand-700);
+  box-shadow: inset -3px 0 0 var(--color-brand-700);
 }
 
 .app-nav-icon {
@@ -183,8 +184,8 @@
 }
 
 .app-sidebar[data-collapsed='true'] .app-nav-group[data-active='true'] > .app-nav-parent {
-  background: #e6f7ff;
-  box-shadow: inset -3px 0 0 #1890ff;
+  background: var(--color-brand-50);
+  box-shadow: inset -3px 0 0 var(--color-brand-700);
 }
 
 .app-sidebar[data-collapsed='true'] .app-sidebar-collapse img {
@@ -282,8 +283,8 @@
   }
 
   .app-sidebar .app-nav-group[data-active='true'] > .app-nav-parent {
-    background: #e6f7ff;
-    box-shadow: inset -3px 0 0 #1890ff;
+    background: var(--color-brand-50);
+    box-shadow: inset -3px 0 0 var(--color-brand-700);
   }
 
   .app-shell-body,

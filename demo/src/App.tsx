@@ -34,6 +34,23 @@ function App() {
     return () => monitoringDemoRuntime.dispose();
   }, [initializeMonitoring]);
 
+  useEffect(() => {
+    if (!demoToolsEnabled || activeModule !== 'event_monitoring') return;
+    let cancelled = false;
+    void monitoringDemoRuntime.bootstrapDefaultEvents()
+      .then(() => {
+        if (!cancelled) {
+          useMonitoringUiStore.getState().setDemoDatasetScope('default');
+          useMonitoringUiStore.getState().resetFilters();
+        }
+      })
+      .catch(() => {
+        // 默认案例加载失败时保留持久化事件的可见性；运行时会在韧性面板展示具体故障。
+        if (!cancelled) useMonitoringUiStore.getState().setDemoDatasetScope('all');
+      });
+    return () => { cancelled = true; };
+  }, [activeModule, demoToolsEnabled]);
+
   const openIntelligentControl = (controlEventId: string) => {
     focusControlEvent(controlEventId);
     setActiveModule('intelligent_control');
@@ -62,10 +79,6 @@ function App() {
             <EventMonitoringWorkspace onOpenIntelligentControl={openIntelligentControl} />
           ) : (
             <main className="intelligent-control-module flex min-h-0 flex-1 flex-col gap-3" data-testid="intelligent-control-module">
-              <header className="monitoring-page-header arco-card">
-                <nav className="monitoring-breadcrumb" aria-label="面包屑"><span>路网综合管控</span><i aria-hidden="true">/</i><strong aria-current="page">智能管控</strong></nav>
-                <div className="monitoring-page-heading"><div><div className="monitoring-page-title-row"><h1>智能管控</h1></div><p>围绕已接管事件开展态势研判、资源协同与处置方案跟踪。</p></div></div>
-              </header>
               <IntelligentControlWorkspace />
             </main>
           )}
