@@ -30,4 +30,21 @@ describe('FR-EM-004 视频事件卡片', () => {
     expect(html).not.toContain('准确率');
     expect(html).not.toContain('车牌');
   });
+
+  it('抽屉预览复用同一事件卡片并仅在画面区域提供播放入口', () => {
+    const item = monitoringListItemFixture();
+    const html = renderToStaticMarkup(
+      <VideoEventCard item={item} variant="drawer-preview" onPlay={() => undefined} />,
+    );
+    expect(html).toContain('data-variant="drawer-preview"');
+    expect(html).toContain('aria-label="火灾事件卡片"');
+    expect(html).toContain('aria-label="播放火灾事件视频"');
+    expect(html).not.toContain('aria-label="查看火灾事件详情"');
+    expect(html).toContain('src="/event-photos/generated/fire-01.webp"');
+    expect(html).not.toContain('monitoring-simulation-tag');
+    expect(html).not.toContain('video-event-cover-caption');
+    expect(html).not.toContain('video-event-card-title');
+    expect(html).toContain('AI置信度');
+    expect(html).toContain('关联告警');
+  });
 });

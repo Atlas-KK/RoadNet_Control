@@ -438,7 +438,7 @@ export function createMonitoringStore(
 
       if (message.payload.evidenceId.includes('-VIDEO')) {
         if (message.payload.status === 'unavailable' && get().dependencyHealth.video.availability !== 'degraded') {
-          await get().degradeDependency('video', '模拟视频服务不可用，已保留关键帧和文字证据');
+          await get().degradeDependency('video', '模拟视频服务不可用，已保留事件卡片和受控证据引用');
         }
         if (message.payload.status === 'available' && get().dependencyHealth.video.availability === 'degraded') {
           await get().restoreDependency('video');
@@ -860,7 +860,6 @@ if (import.meta.env.DEV && typeof window !== 'undefined') {
 export function selectCurrentSimulatedUser(state: MonitoringState): SimulatedUser {
   return findSimulatedUser(state.currentUserId) ?? SIMULATED_USERS[0];
 }
-
 
 
 

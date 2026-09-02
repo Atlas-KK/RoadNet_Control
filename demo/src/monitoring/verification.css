@@ -1,11 +1,21 @@
 .monitoring-verification-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(330px, .65fr);
+  grid-template-columns: minmax(340px, .88fr) minmax(440px, 1.12fr);
   gap: 14px;
   align-items: start;
 }
 
+.monitoring-verification-evidence {
+  position: sticky;
+  top: 0;
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 12px;
+}
+
 .verification-console {
+  min-width: 0;
   border: 1px solid var(--color-border-2);
   border-radius: 8px;
   padding: 14px;
@@ -62,7 +72,7 @@
 }
 
 .verification-form {
-  gap: 11px;
+  gap: 14px;
 }
 
 .verification-form label {
@@ -74,6 +84,28 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 9px;
+}
+
+.verification-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  border-top: 1px solid var(--color-line);
+  padding-top: 13px;
+}
+
+.verification-form-section:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.verification-form-section h3,
+.verification-result h3,
+.monitoring-system-facts h3 {
+  margin: 0;
+  color: var(--color-text-1);
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .verification-form input,
@@ -104,10 +136,70 @@
 
 .verification-submit-actions {
   flex-wrap: wrap;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  border-top: 1px solid var(--color-line);
+  padding-top: 12px;
+  background: var(--color-fill-1);
 }
 
-@media (max-width: 1200px) {
+.verification-result {
+  border-top: 1px solid var(--color-line);
+  padding-top: 13px;
+}
+
+.verification-result dl,
+.monitoring-system-facts dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 10px 0 0;
+}
+
+.verification-result dl div,
+.monitoring-system-facts dl div {
+  min-width: 0;
+}
+
+.verification-result dt,
+.monitoring-system-facts dt {
+  color: var(--color-text-3);
+  font-size: 11px;
+}
+
+.verification-result dd,
+.monitoring-system-facts dd {
+  overflow-wrap: anywhere;
+  margin: 4px 0 0;
+  color: var(--color-text-1);
+  font-size: 12px;
+}
+
+.monitoring-system-facts {
+  border: 1px solid var(--color-border-2);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.monitoring-system-facts dl {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 1180px) {
   .monitoring-verification-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .monitoring-verification-evidence {
+    position: static;
+  }
+}
+
+@media (max-width: 720px) {
+  .verification-field-grid,
+  .verification-result dl,
+  .monitoring-system-facts dl {
     grid-template-columns: 1fr;
   }
 }

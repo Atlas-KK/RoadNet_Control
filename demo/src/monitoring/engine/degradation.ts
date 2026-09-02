@@ -18,7 +18,7 @@ export const DEFAULT_MONITORING_DEPENDENCY_HEALTH: MonitoringDependencyHealth = 
 
 const DEFAULT_REASON: Record<MonitoringDependency, string> = {
   gis: 'GIS底图服务不可用，已切换路网示意图',
-  video: '视频服务不可用，已降级为关键帧和文字证据',
+  video: '视频服务不可用，已保留事件卡片和受控证据引用',
   ai: 'AI辅助服务不可用，保留规则建议、人工补报和历史核实',
   control: '智能管控服务不可用，核实结果已保留，可稍后重试接管',
 };

@@ -15,6 +15,7 @@ import { findSimulatedUser, hasMonitoringPermission, type SimulatedUser } from '
 import {
   MONITORING_EVENT_TYPE_LABELS,
   MONITORING_LEVEL_LABELS,
+  VERIFICATION_STATUS_LABELS,
   type MonitoringListItem,
 } from '../selectors';
 import { SystemOperationalClock } from '../services/operationalClock';
@@ -55,6 +56,17 @@ function numericValue(value: string): number | undefined {
 function integerValue(value: string): number | undefined {
   const parsed = numericValue(value);
   return parsed !== undefined && Number.isSafeInteger(parsed) ? parsed : undefined;
+}
+
+function formatDate(value: string | undefined): string {
+  return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '暂无';
+}
+
+function lifecycleLabel(status: MonitoringListItem['event']['lifecycleStatus']): string {
+  return {
+    monitoring: '持续监测', pending_handoff: '待接管', handoff_in_progress: '接管中', taken_over: '已接管',
+    handoff_failed: '接管失败', resolved: '已解除', closed: '已关闭',
+  }[status];
 }
 
 interface VerificationPanelProps {
@@ -203,14 +215,24 @@ export default function VerificationPanel({ item, taskOverride, currentUserOverr
 
   return (
     <div className="monitoring-verification-layout">
-      <EvidencePanel item={item} videoUnavailableReason={videoHealth.availability === 'degraded' ? videoHealth.reason : undefined} />
+      <div className="monitoring-verification-evidence">
+        <EvidencePanel item={item} videoUnavailableReason={videoHealth.availability === 'degraded' ? videoHealth.reason : undefined} />
+        <section className="monitoring-system-facts arco-surface-subtle" aria-labelledby="monitoring-system-facts-title">
+          <h3 id="monitoring-system-facts-title">系统信息</h3>
+          <dl>
+            <div><dt>事件状态</dt><dd>{lifecycleLabel(event.lifecycleStatus)}</dd></div>
+            <div><dt>所属设施</dt><dd>{event.location.facilityId ?? '一般道路区间'}</dd></div>
+            <div><dt>最近更新</dt><dd>{formatDate(event.updatedAt)}</dd></div>
+          </dl>
+        </section>
+      </div>
       <section className="verification-console arco-surface-subtle" aria-label="人工核实操作">
         <header className="verification-console-header">
           <div>
             <span>核实任务</span>
             <strong>{task?.status === 'observation' ? '持续观察' : owner ? `${owner.displayName}占用中` : finalStatus ? '核实已完成' : '待认领'}</strong>
           </div>
-          <span className={`verification-countdown ${(remaining ?? 1) < 0 ? 'is-overdue' : ''}`}>{countdownLabel(remaining)}</span>
+          {!finalStatus ? <span className={`verification-countdown ${(remaining ?? 1) < 0 ? 'is-overdue' : ''}`}>{countdownLabel(remaining)}</span> : undefined}
         </header>
 
         {notice ? <div className="arco-alert" role="status">{notice}</div> : undefined}
@@ -235,24 +257,50 @@ export default function VerificationPanel({ item, taskOverride, currentUserOverr
           </div>
         ) : undefined}
 
+        {finalStatus ? (
+          <section className="verification-result" aria-labelledby="verification-result-title">
+            <h3 id="verification-result-title">核实结果</h3>
+            <dl>
+              <div><dt>核实结论</dt><dd>{VERIFICATION_STATUS_LABELS[event.verificationStatus]}</dd></div>
+              <div><dt>人工确认等级</dt><dd>{event.confirmedLevel ? MONITORING_LEVEL_LABELS[event.confirmedLevel] : '未确认等级'}</dd></div>
+            </dl>
+          </section>
+        ) : undefined}
+
         {ownedByMe ? (
           <form className="verification-form" onSubmit={(formEvent) => formEvent.preventDefault()}>
-            <div className="verification-field-grid">
-              <label>事件类型<select value={eventType} onChange={(change) => setEventType(change.target.value as MonitoringEventType)}>{MONITORING_EVENT_TYPES.map((type) => <option key={type} value={type}>{MONITORING_EVENT_TYPE_LABELS[type]}</option>)}</select></label>
-              <label>人工确认等级<select value={confirmedLevel} onChange={(change) => setConfirmedLevel(change.target.value as MonitoringLevel)}>{LEVELS.map((level) => <option key={level} value={level}>{MONITORING_LEVEL_LABELS[level]}</option>)}</select></label>
-              <label>路线<input value={roadCode} onChange={(change) => setRoadCode(change.target.value)} /></label>
-              <label>方向<select value={direction} onChange={(change) => setDirection(change.target.value as typeof direction)}><option value="up">上行</option><option value="down">下行</option><option value="unknown">未知</option></select></label>
-              <label>桩号<input type="number" min="0" step="0.1" value={kilometer} onChange={(change) => setKilometer(change.target.value)} /></label>
-              <label>影响车道数<input type="number" min="0" step="1" value={lanesAffected} onChange={(change) => setLanesAffected(change.target.value)} /></label>
-              <label>总车道数<input type="number" min="1" step="1" value={lanesTotal} onChange={(change) => setLanesTotal(change.target.value)} /></label>
-              <label>涉及车辆数<input type="number" min="0" step="1" value={vehicleCount} onChange={(change) => setVehicleCount(change.target.value)} /></label>
-              <label>伤亡人数<input type="number" min="0" step="1" value={casualties} onChange={(change) => setCasualties(change.target.value)} /></label>
-              <label>流量（辆/小时）<input type="number" min="0" step="1" value={flowVehPerHour} onChange={(change) => setFlowVehPerHour(change.target.value)} /></label>
-              <label>车速（公里/小时）<input type="number" min="0" step="0.1" value={speedKmh} onChange={(change) => setSpeedKmh(change.target.value)} /></label>
-            </div>
-            <label className="verification-checkbox"><input type="checkbox" checked={hazardousMaterials} onChange={(change) => setHazardousMaterials(change.target.checked)} />涉及危化品</label>
-            <label>核实依据/等级调整原因<textarea value={reason} onChange={(change) => setReason(change.target.value)} placeholder="误报、观察及L3/L4降级时必填" /></label>
-            <label>订正备注<textarea value={notes} onChange={(change) => setNotes(change.target.value)} placeholder="历史结论不会覆盖，本次内容将追加为新版本" /></label>
+            <section className="verification-form-section" aria-labelledby="verification-conclusion-title">
+              <h3 id="verification-conclusion-title">核实结论</h3>
+              <div className="verification-field-grid">
+                <label>事件类型<select value={eventType} onChange={(change) => setEventType(change.target.value as MonitoringEventType)}>{MONITORING_EVENT_TYPES.map((type) => <option key={type} value={type}>{MONITORING_EVENT_TYPE_LABELS[type]}</option>)}</select></label>
+                <label>人工确认等级<select value={confirmedLevel} onChange={(change) => setConfirmedLevel(change.target.value as MonitoringLevel)}>{LEVELS.map((level) => <option key={level} value={level}>{MONITORING_LEVEL_LABELS[level]}</option>)}</select></label>
+              </div>
+            </section>
+            <section className="verification-form-section" aria-labelledby="verification-location-title">
+              <h3 id="verification-location-title">位置订正</h3>
+              <div className="verification-field-grid">
+                <label>路线<input value={roadCode} onChange={(change) => setRoadCode(change.target.value)} /></label>
+                <label>方向<select value={direction} onChange={(change) => setDirection(change.target.value as typeof direction)}><option value="up">上行</option><option value="down">下行</option><option value="unknown">未知</option></select></label>
+                <label>桩号<input type="number" min="0" step="0.1" value={kilometer} onChange={(change) => setKilometer(change.target.value)} /></label>
+              </div>
+            </section>
+            <section className="verification-form-section" aria-labelledby="verification-impact-title">
+              <h3 id="verification-impact-title">影响范围</h3>
+              <div className="verification-field-grid">
+                <label>影响车道数<input type="number" min="0" step="1" value={lanesAffected} onChange={(change) => setLanesAffected(change.target.value)} /></label>
+                <label>总车道数<input type="number" min="1" step="1" value={lanesTotal} onChange={(change) => setLanesTotal(change.target.value)} /></label>
+                <label>涉及车辆数<input type="number" min="0" step="1" value={vehicleCount} onChange={(change) => setVehicleCount(change.target.value)} /></label>
+                <label>伤亡人数<input type="number" min="0" step="1" value={casualties} onChange={(change) => setCasualties(change.target.value)} /></label>
+                <label>流量（辆/小时）<input type="number" min="0" step="1" value={flowVehPerHour} onChange={(change) => setFlowVehPerHour(change.target.value)} /></label>
+                <label>车速（公里/小时）<input type="number" min="0" step="0.1" value={speedKmh} onChange={(change) => setSpeedKmh(change.target.value)} /></label>
+              </div>
+              <label className="verification-checkbox"><input type="checkbox" checked={hazardousMaterials} onChange={(change) => setHazardousMaterials(change.target.checked)} />涉及危化品</label>
+            </section>
+            <section className="verification-form-section" aria-labelledby="verification-notes-title">
+              <h3 id="verification-notes-title">补充说明</h3>
+              <label>核实依据/等级调整原因<textarea value={reason} onChange={(change) => setReason(change.target.value)} placeholder="误报、观察及L3/L4降级时必填" /></label>
+              <label>订正备注<textarea value={notes} onChange={(change) => setNotes(change.target.value)} placeholder="历史结论不会覆盖，本次内容将追加为新版本" /></label>
+            </section>
             {(isL4 || isL4Downgrade) ? (
               <p className="verification-permission-hint">L4降级、误报或持续观察必须由当前登录的监控班长本人接管任务后提交。</p>
             ) : undefined}

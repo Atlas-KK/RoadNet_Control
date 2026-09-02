@@ -59,6 +59,19 @@ describe('FR-EM-001 / FR-EM-011 监测UI会话状态', () => {
     expect(persisted.demoDatasetScope).toBe('all');
   });
 
+  it('将合并前保存的事件信息页签迁移到核实详情', () => {
+    const snapshot = {
+      version: 1,
+      activeView: 'video_monitoring',
+      filters: {},
+      sort: 'default_priority',
+      gridScrollOffset: 0,
+      drawerTab: 'event',
+    };
+    const { storage } = createStorage({ [MONITORING_UI_SESSION_KEY]: JSON.stringify(snapshot) });
+    expect(readMonitoringUiState(storage).drawerTab).toBe('video');
+  });
+
   it('损坏数据回退默认状态', () => {
     const { storage } = createStorage({ [MONITORING_UI_SESSION_KEY]: '{bad-json' });
     const restored = readMonitoringUiState(storage);

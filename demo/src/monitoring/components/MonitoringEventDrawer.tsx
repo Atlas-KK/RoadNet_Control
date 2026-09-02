@@ -20,26 +20,14 @@ interface MonitoringEventDrawerProps {
 }
 
 const DRAWER_TABS: readonly { id: MonitoringDrawerTab; label: string }[] = [
-  { id: 'video', label: '视频核实' },
+  { id: 'video', label: '核实详情' },
   { id: 'alarms', label: '关联告警' },
-  { id: 'event', label: '事件信息' },
   { id: 'verification_history', label: '核实记录' },
   { id: 'control', label: '关联处置' },
 ];
 
 function formatDate(value: string | undefined): string {
   return value ? new Date(value).toLocaleString('zh-CN', { hour12: false }) : '暂无';
-}
-
-function directionLabel(direction: MonitoringListItem['event']['location']['direction']): string {
-  return direction === 'up' ? '上行' : direction === 'down' ? '下行' : '方向未知';
-}
-
-function lifecycleLabel(status: MonitoringListItem['event']['lifecycleStatus']): string {
-  return {
-    monitoring: '持续监测', pending_handoff: '待接管', handoff_in_progress: '接管中', taken_over: '已接管',
-    handoff_failed: '接管失败', resolved: '已解除', closed: '已关闭',
-  }[status];
 }
 
 function AlarmList({ item }: { item: MonitoringListItem }) {
@@ -59,26 +47,6 @@ function AlarmList({ item }: { item: MonitoringListItem }) {
       ))}
     </div>
   ) : <div className="monitoring-drawer-empty">暂无关联告警</div>;
-}
-
-function EventInformation({ item }: { item: MonitoringListItem }) {
-  const { event } = item;
-  return (
-    <dl className="monitoring-event-information">
-      <div><dt>事件编号</dt><dd>{event.monitoringEventId}</dd></div>
-      <div><dt>事件类型</dt><dd>{MONITORING_EVENT_TYPE_LABELS[event.eventType]}</dd></div>
-      <div><dt>AI建议等级</dt><dd>{MONITORING_LEVEL_LABELS[event.suggestedLevel]}</dd></div>
-      <div><dt>人工确认等级</dt><dd>{event.confirmedLevel ? MONITORING_LEVEL_LABELS[event.confirmedLevel] : '尚未确认'}</dd></div>
-      <div><dt>核实状态</dt><dd>{VERIFICATION_STATUS_LABELS[event.verificationStatus]}</dd></div>
-      <div><dt>事件状态</dt><dd>{lifecycleLabel(event.lifecycleStatus)}</dd></div>
-      <div><dt>道路位置</dt><dd>{event.location.roadCode} · {directionLabel(event.location.direction)} · {event.location.kilometer === undefined ? '桩号待补充' : `K${event.location.kilometer.toFixed(1)}`}</dd></div>
-      <div><dt>设施</dt><dd>{event.location.facilityId ?? '一般道路区间'}</dd></div>
-      <div><dt>关联告警</dt><dd>{item.alarms.length} 条</dd></div>
-      <div><dt>事件综合可信度</dt><dd>{item.eventConfidence === undefined ? '暂无' : `${Math.round(item.eventConfidence * 100)}%`}</dd></div>
-      <div><dt>首次检测</dt><dd>{formatDate(event.detectedAt)}</dd></div>
-      <div><dt>最近更新</dt><dd>{formatDate(event.updatedAt)}</dd></div>
-    </dl>
-  );
 }
 
 function ControlAssociation({ item, onOpenIntelligentControl }: {
@@ -169,11 +137,11 @@ export default function MonitoringEventDrawer({ item, activeTab, onTabChange, on
     >
       <header className="monitoring-drawer-header">
         <div>
-          <span className="monitoring-drawer-eyebrow">视频事件核实详情 · 打开详情不占用</span>
+          <span className="monitoring-drawer-eyebrow">事件核实详情 · 打开详情不占用</span>
           <h2>{MONITORING_EVENT_TYPE_LABELS[event.eventType]} <small>{event.monitoringEventId}</small></h2>
           <div className="monitoring-drawer-tags">
-            <span className={`monitoring-level-badge level-${item.displayLevel.toLowerCase()}`}>{MONITORING_LEVEL_LABELS[item.displayLevel]}</span>
-            <span className="arco-tag">{VERIFICATION_STATUS_LABELS[event.verificationStatus]}</span>
+            <span className={`monitoring-level-badge level-${event.suggestedLevel.toLowerCase()}`}>AI建议 {MONITORING_LEVEL_LABELS[event.suggestedLevel]}</span>
+            <span className="arco-tag">核实状态：{VERIFICATION_STATUS_LABELS[event.verificationStatus]}</span>
             {event.simulation ? <span className="arco-tag monitoring-simulation-tag">模拟</span> : undefined}
           </div>
         </div>
@@ -197,7 +165,6 @@ export default function MonitoringEventDrawer({ item, activeTab, onTabChange, on
       <div className="monitoring-drawer-content">
         {activeTab === 'video' ? <VerificationPanel item={item} /> : undefined}
         {activeTab === 'alarms' ? <AlarmList item={item} /> : undefined}
-        {activeTab === 'event' ? <EventInformation item={item} /> : undefined}
         {activeTab === 'verification_history' ? <VerificationHistory eventId={event.monitoringEventId} /> : undefined}
         {activeTab === 'control' ? <ControlAssociation item={item} onOpenIntelligentControl={onOpenIntelligentControl} /> : undefined}
       </div>

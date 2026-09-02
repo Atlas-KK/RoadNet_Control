@@ -170,7 +170,7 @@ export class MonitoringDemoRuntime {
   async injectVideoFailure(failed: boolean): Promise<void> {
     this.adapter.injectFailure(failed ? 'video_failure' : 'video_restored');
     if (failed) {
-      await this.store.getState().degradeDependency('video', '模拟视频服务不可用，已保留关键帧和文字证据');
+      await this.store.getState().degradeDependency('video', '模拟视频服务不可用，已保留事件卡片和受控证据引用');
     } else {
       await this.store.getState().restoreDependency('video');
     }

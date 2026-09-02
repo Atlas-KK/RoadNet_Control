@@ -4,7 +4,7 @@ import type { MonitoringEventType, MonitoringLevel, TravelDirection, Verificatio
 import type { MonitoringMetricKey } from './engine/monitoringMetrics';
 
 export type MonitoringView = 'video_monitoring' | 'gis_awareness';
-export type MonitoringDrawerTab = 'video' | 'alarms' | 'event' | 'verification_history' | 'control';
+export type MonitoringDrawerTab = 'video' | 'alarms' | 'verification_history' | 'control';
 export type MonitoringSort = 'default_priority' | 'detected_desc' | 'level_desc';
 export type MonitoringDemoDatasetScope = 'default' | 'all';
 
@@ -133,9 +133,12 @@ export function parseMonitoringUiSnapshot(value: unknown): MonitoringUiSnapshot 
     selectedMonitoringEventId: typeof value.selectedMonitoringEventId === 'string' ? value.selectedMonitoringEventId : undefined,
     gridScrollOffset: typeof value.gridScrollOffset === 'number' && value.gridScrollOffset >= 0 ? value.gridScrollOffset : 0,
     mapViewport,
-    drawerTab: value.drawerTab === 'alarms' || value.drawerTab === 'event' || value.drawerTab === 'verification_history' || value.drawerTab === 'control'
-      ? value.drawerTab
-      : 'video',
+    // 兼容合并前持久化的“事件信息”页签，统一迁移到新的“核实详情”。
+    drawerTab: value.drawerTab === 'event'
+      ? 'video'
+      : value.drawerTab === 'alarms' || value.drawerTab === 'verification_history' || value.drawerTab === 'control'
+        ? value.drawerTab
+        : 'video',
     demoDatasetScope: value.demoDatasetScope === 'default' ? 'default' : 'all',
   };
 }

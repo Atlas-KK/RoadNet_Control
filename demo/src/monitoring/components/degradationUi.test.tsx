@@ -11,7 +11,7 @@ import MonitoringGisView from './MonitoringGisView';
 describe('阶段10 AC16/17 页面降级', () => {
   beforeEach(() => useMonitoringStore.setState({ dependencyHealth: DEFAULT_MONITORING_DEPENDENCY_HEALTH }));
 
-  it('视频不可用和证据归档时仍展示关键帧、文字证据及归档提示', () => {
+  it('视频不可用和证据归档时仍展示事件卡片及归档提示', () => {
     const base = monitoringListItemFixture();
     const alarm = freezeAlarm({ ...base.primaryAlarm!, evidence: [
       { evidenceId: 'FRAME-1', kind: 'key_frame', capturedAt: base.event.detectedAt, controlledRef: 'controlled://frame', available: true, archived: true, simulation: true },
@@ -19,8 +19,9 @@ describe('阶段10 AC16/17 页面降级', () => {
     ], evidenceIds: ['FRAME-1', 'VIDEO-1'] });
     const html = renderToStaticMarkup(<EvidencePanel item={{ ...base, primaryAlarm: alarm, alarms: [alarm] }} />);
     expect(html).toContain('视频暂不可用');
-    expect(html).toContain('模拟关键帧');
-    expect(html).toContain('文字证据');
+    expect(html).toContain('data-variant="drawer-preview"');
+    expect(html).not.toContain('算法信息');
+    expect(html).not.toContain('文字证据');
     expect(html).toContain('1项证据已归档');
   });
 

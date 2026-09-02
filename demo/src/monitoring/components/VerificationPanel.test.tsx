@@ -44,7 +44,23 @@ describe('FR-EM-006 人工核实操作台', () => {
       '必须由当前登录的监控班长本人']) {
       expect(html).toContain(label);
     }
+    for (const section of ['核实结论', '位置订正', '影响范围', '补充说明']) expect(html).toContain(section);
     for (const action of ['确认事件', '持续观察', '判定误报', '释放任务']) expect(html).toContain(action);
+  });
+
+  it('核实完成后以紧凑结果区展示人工结论，不再重复整块事件信息', () => {
+    const item = monitoringListItemFixture();
+    const confirmedEvent = {
+      ...item.event,
+      verificationStatus: 'confirmed' as const,
+      confirmedLevel: 'L3' as const,
+    };
+    const html = renderToStaticMarkup(<VerificationPanel item={{ ...item, event: confirmedEvent }} />);
+    expect(html).toContain('核实结果');
+    expect(html).toContain('人工确认等级');
+    expect(html).toContain('L3 较重');
+    expect(html).toContain('系统信息');
+    expect(html).not.toContain('开始核实');
   });
 
   it('无核实权限角色看得到事件但看不到开始核实按钮', () => {

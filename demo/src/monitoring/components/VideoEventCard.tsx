@@ -8,9 +8,11 @@ import {
 
 interface VideoEventCardProps {
   item: MonitoringListItem;
-  operationalNowMs: number;
-  selected: boolean;
-  onOpen: (eventId: string) => void;
+  operationalNowMs?: number;
+  selected?: boolean;
+  onOpen?: (eventId: string) => void;
+  variant?: 'interactive' | 'drawer-preview';
+  onPlay?: () => void;
   videoUnavailableReason?: string;
 }
 
@@ -46,28 +48,39 @@ function controlStatusLabel(status: NonNullable<MonitoringListItem['event']['con
     false_positive_confirmed: '已确认误报' }[status];
 }
 
-export default function VideoEventCard({ item, operationalNowMs, selected, onOpen, videoUnavailableReason }: VideoEventCardProps) {
+export default function VideoEventCard({
+  item,
+  operationalNowMs,
+  selected = false,
+  onOpen,
+  variant = 'interactive',
+  onPlay,
+  videoUnavailableReason,
+}: VideoEventCardProps) {
   const { event, primaryAlarm } = item;
   const videoEvidence = primaryAlarm?.evidence?.find((evidence) => evidence.kind === 'video_clip');
   const hasVideo = !videoUnavailableReason && videoEvidence?.available !== false && primaryAlarm?.evidenceIds.some((id) => /VIDEO|CLIP/i.test(id));
   const coverImage = eventImageSource(item);
   const fallbackImage = EVENT_IMAGE_FALLBACKS[event.eventType];
-  const openEvent = () => onOpen(event.monitoringEventId);
+  const interactive = variant === 'interactive' && Boolean(onOpen);
+  const openEvent = () => onOpen?.(event.monitoringEventId);
+  const displayNowMs = operationalNowMs ?? Date.parse(event.updatedAt);
   return (
     <article
       className="video-event-card arco-card"
       data-selected={selected}
+      data-variant={variant}
       data-testid="video-event-card"
-      role="button"
-      tabIndex={0}
-      aria-label={`查看${MONITORING_EVENT_TYPE_LABELS[event.eventType]}事件详情`}
-      onClick={openEvent}
-      onKeyDown={(keyboardEvent) => {
+      role={interactive ? 'button' : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      aria-label={interactive ? `查看${MONITORING_EVENT_TYPE_LABELS[event.eventType]}事件详情` : `${MONITORING_EVENT_TYPE_LABELS[event.eventType]}事件卡片`}
+      onClick={interactive ? openEvent : undefined}
+      onKeyDown={interactive ? (keyboardEvent) => {
         if (keyboardEvent.key === 'Enter' || keyboardEvent.key === ' ') {
           keyboardEvent.preventDefault();
           openEvent();
         }
-      }}
+      } : undefined}
     >
       <div className="video-event-cover" aria-label={`${MONITORING_EVENT_TYPE_LABELS[event.eventType]}模拟监控画面`}>
         <img
@@ -85,22 +98,39 @@ export default function VideoEventCard({ item, operationalNowMs, selected, onOpe
           }}
         />
         <div className="video-event-cover-shade" aria-hidden="true" />
-        <div className="video-event-cover-top">
-          <span className="arco-tag monitoring-simulation-tag">模拟画面</span>
-          <span className={`monitoring-level-badge level-${item.displayLevel.toLowerCase()}`}>{MONITORING_LEVEL_LABELS[item.displayLevel]}</span>
-        </div>
-        <div className="video-event-cover-caption">
-          <strong>{MONITORING_EVENT_TYPE_LABELS[event.eventType]}</strong>
-          <span>{hasVideo ? '模拟监控视频关键帧' : '关键帧降级画面'}</span>
-        </div>
-        <span className="video-event-cover-time">{describeDetectedTime(event.detectedAt, operationalNowMs)}</span>
+        {variant === 'interactive' ? (
+          <>
+            <div className="video-event-cover-top">
+              <span className="arco-tag monitoring-simulation-tag">模拟画面</span>
+              <span className={`monitoring-level-badge level-${item.displayLevel.toLowerCase()}`}>{MONITORING_LEVEL_LABELS[item.displayLevel]}</span>
+            </div>
+            <div className="video-event-cover-caption">
+              <strong>{MONITORING_EVENT_TYPE_LABELS[event.eventType]}</strong>
+              <span>{hasVideo ? '模拟监控视频关键帧' : '关键帧降级画面'}</span>
+            </div>
+          </>
+        ) : undefined}
+        <span className="video-event-cover-time">{describeDetectedTime(event.detectedAt, displayNowMs)}</span>
+        {variant === 'drawer-preview' ? (
+          <button
+            type="button"
+            className="video-event-cover-play"
+            aria-label={hasVideo ? `播放${MONITORING_EVENT_TYPE_LABELS[event.eventType]}事件视频` : '视频暂不可用'}
+            disabled={!hasVideo}
+            onClick={onPlay}
+          >
+            <span aria-hidden="true">▶</span>
+          </button>
+        ) : undefined}
       </div>
 
       <div className="video-event-card-body">
-        <div className="video-event-card-title">
-          <strong>{MONITORING_EVENT_TYPE_LABELS[event.eventType]}</strong>
-          <span className={`verification-pill status-${event.verificationStatus}`}>{VERIFICATION_STATUS_LABELS[event.verificationStatus]}</span>
-        </div>
+        {variant === 'interactive' ? (
+          <div className="video-event-card-title">
+            <strong>{MONITORING_EVENT_TYPE_LABELS[event.eventType]}</strong>
+            <span className={`verification-pill status-${event.verificationStatus}`}>{VERIFICATION_STATUS_LABELS[event.verificationStatus]}</span>
+          </div>
+        ) : undefined}
         <dl className="video-event-card-meta">
           <div><dt>位置</dt><dd>{event.location.roadCode} · {directionLabel(event.location.direction)} · {kilometerLabel(event.location.kilometer)}</dd></div>
           <div><dt>摄像机</dt><dd>{primaryAlarm?.location.deviceId ?? '设备待关联'}</dd></div>
