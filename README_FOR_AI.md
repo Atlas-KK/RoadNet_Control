@@ -3,7 +3,7 @@
 > **用途**：本文件是项目的工程 Harness + Long-term Memory。后续 Codex 在分析、修改或验证代码前，应先阅读本文件，再按文中的证据优先级和工作协议开展任务。
 >
 > **最后核查**：2026-09-02（Asia/Shanghai）
-> **代码基线**：`main` / `cd0d5e5`（`事件监测模块新增24个演示案例`）
+> **代码基线**：`main` / `359f1de`（`事件监测模块前端改造`）
 > **工作区状态**：存在未提交修改；本文件不代表这些修改已经验收或可提交。
 > **适用范围**：仓库根目录、`demo/` 前端 MVP、事件监测子模块及配套产品/验收文档。
 > **可信度规则**：当前代码与测试 > 当前 Git 状态 > 已批准产品/验收文档 > 历史 README 和变更日志。无法由代码确认的内容必须标为“待确认”或“历史结论”。
@@ -100,21 +100,16 @@
 
 ### 3.1 版本与工作区
 
-截至本次核查，当前分支为 `main`，最近提交为 `cd0d5e5`。工作区存在用户未提交变更，主要集中在：
+截至本次核查，当前分支为 `main`，最近提交为 `359f1de`。开始核查时，已跟踪文件无未提交改动，仅有用户本地的未跟踪文件 `.claude/settings.local.json`；本次任务不读取、不修改该文件。提交 `359f1de` 已包含事件监测详情抽屉、证据预览、人工核实表单、降级文案、UI 快照兼容和相应测试的改造。
 
-- `demo/src/monitoring/components/`：证据、核实、事件详情和视频卡片交互/样式；
-- `demo/src/monitoring/engine/degradation.ts` 与运行时：依赖降级表现；
-- `demo/src/monitoring/store.ts`、`uiState.ts`：监测模块状态；
-- 相关 Vitest 测试、`产品文档/事件监测模块_PRD_v0.3.md`；
-- 另有一个被删除的大型视觉稿和未跟踪的 `.claude/settings.local.json`。
-
-这些变更不是本文件产生的，也不能默认已经完成验收。任何任务开始前先运行 `git status --short`，只修改当前任务涉及的文件。
+本次任务只更新根目录 `README_FOR_AI.md` 与 `README.md`。任何后续任务仍须先运行 `git status --short`，重新识别并保留用户改动。
 
 ### 3.2 已实现且可由代码确认的主链
 
 - 应用壳支持 **态势驾驶舱 / 事件监测 / 智能管控** 三种视图；当前模块选择保存于 `sessionStorage`。
 - 智能管控支持事件接入、归并、五步推理、交通流计算、预案构建/比较、人工确认、指令回执、交通响应、终报与数据集导出。
 - 事件监测拥有独立领域模型、Zustand Store、IndexedDB 仓储、内存降级、模拟用户权限、核实状态机、严重事件接管、双向同步和监测 GIS 模型。
+- 事件监测进入模块时幂等补齐 24 条默认待核实模拟事件（8 类各 3 条）；当前详情抽屉为“核实详情 / 关联告警 / 核实记录 / 关联处置”四页签，旧 `event` 页签快照会迁移到“核实详情”。
 - 事件监测到智能管控的接管通过本地 `ControlBridge` 和 `CrossModuleSyncBus` 模拟；代码保留幂等键、版本与序列号语义。
 - 外部 LLM 失败、Schema 校验失败或值级溯源不通过时，智能管控回退本地模板/规则结论；监测视频或存储不可用时须显示明确降级状态。
 
@@ -122,7 +117,29 @@
 
 `产品文档/事件监测模块_阶段11全量验收与交付报告_v0.2.md` 记录的历史结论是：P0 代码链路和自动化验收通过；26 条 AC 中 24 条通过、AC-18 部分通过、AC-19（真实浏览器连续 2 小时稳定性）未完成。浏览器视觉、响应式、真实时延和 2 小时墙钟验收不可宣称完成。
 
-本次核查未能重新执行 `npm run check`：当前沙箱没有可用的 `npm`，直接运行 `pnpm exec oxlint` 也无法找到本地可执行文件。因此，**本轮未重新验证 lint、Vitest、TypeScript 或生产构建**；历史报告只能作为历史证据，不能替代当前工作区验证。
+本次核查使用 Codex 工作区提供的 Node.js 直接调用本地 CLI，完成了与 `npm run check` 相同的 lint → Vitest → TypeScript → Vite build 门禁：
+
+- 事件监测前端改造定向回归：6 个测试文件、18 项用例通过；
+- 全量 Vitest：94 个测试文件、403 项用例通过；
+- `tsc -b` 与 Vite 生产构建通过；
+- Oxlint 无错误，保留 2 条警告：`EventTriageList.tsx` 渲染期调用 `Date.now()`，`TrafficFlowMonitor.tsx` 渲染期读取 ref。
+
+由于当前命令环境未把 `npm` 放入 `PATH`，本轮没有直接执行脚本名 `npm run check`；上述四个底层步骤均已实际执行。浏览器视觉、响应式、真实时延和 2 小时墙钟验收仍未补齐。
+
+### 3.4 实现状态矩阵
+
+状态口径：**已确认**表示有当前源码、配置或测试直接支撑；**基于代码推断**表示由现有适配边界、降级路径或仓库中缺少生产端资产归纳，仍需在接入时复核；**待确认**表示仓库无法决定的业务、安全、权限、保留或外部副作用策略，统一列入第 12 节。
+
+| 能力 | 当前状态 | 证据与边界 |
+| --- | --- | --- |
+| 三模块应用壳、事件监测、智能管控主链 | 已实现（代码确认） | `App.tsx`、两个 Store、engine/services、当前全量测试 |
+| 24 条默认监测事件与六类专项场景 | 已实现的演示能力 | `defaultMonitoringEvents.ts`、`demoScenarios.ts` 及对应测试；均为模拟数据 |
+| 事件核实详情、权限门禁、等级确认与历史追加 | 已实现（代码确认） | `VerificationPanel.tsx`、`verificationMachine.ts`、Store 与组件/状态机测试 |
+| IndexedDB/localStorage、接管桥和跨模块总线 | 已实现的本地 MVP 能力 | 浏览器本地持久化与内存消息总线，不提供跨浏览器或服务端可靠性 |
+| 高德地图与 OpenAI 兼容 LLM | 部分实现 / 可选增强（已确认） | 依赖外部配置；失败时走示意图、本地规则或显式降级 |
+| 视频证据、雷视融合、设备状态和指令回执 | 模拟 / 演示 / 占位 | 使用内置图片、视频与动态模型；不连接真实视频流、传感器或控制接口 |
+| 旧详情 `event` 页签、旧解释字段 | 已弃用 / 兼容保留 | UI 快照将 `event` 迁移到 `video`；`TraceRecord.explanation` 仅兼容旧快照 |
+| 生产鉴权/RBAC、后端审计、真实派单与生产数据接入 | 未实现（基于代码推断） | 当前仓库未见服务端实现；接口、安全、权限、保留与副作用策略均待确认 |
 
 ---
 
@@ -334,6 +351,7 @@ flowchart LR
 | 监测与管控双向更新乱序 | `CrossModuleSyncBus` 按全局序列记录、Store 管理游标/已处理消息 | 不以 UI 当前状态覆盖版本更新，先验证关联 ID、版本和序列 |
 | 使用演示数据得出生产结论 | 文案与 PRD 多处规定事实/仿真/预测分离 | 任何简报、导出和界面新增文本都必须保留来源与置信度说明 |
 | 历史验收环境受 Windows sandbox/浏览器工具影响 | 阶段 11 报告保留浏览器烟测和 AC-19 未完成项 | 环境恢复后补做真实浏览器视觉、响应式、时延和 2 小时稳定性验收，不可只跑单测后宣称闭环 |
+| Oxlint 当前存在 2 条 React 警告 | `EventTriageList.tsx` 渲染期调用 `Date.now()`；`TrafficFlowMonitor.tsx` 渲染期读取 ref | 涉及这两个组件时优先消除警告；在修复前不得把 lint 描述为“零告警” |
 
 ---
 
@@ -350,18 +368,18 @@ flowchart LR
 | `services/llm.ts` | 输出可信度和安全边界 | Schema/值级验证与本地兜底相关测试 |
 | `gis/`、`monitoring/gis/` | 地图与列表/工作台状态可能脱节 | GIS 模型测试、无地图降级与聚焦联动检查 |
 
-### 10.1 P0 约束—影响文件—最低验证索引
+### 10.1 P0 约束—影响区域—最低验证—证据来源索引
 
-| P0 约束 | 典型影响文件 | 最低验证 |
-| --- | --- | --- |
-| 事件归并、推理、流量、预案和五案例锚点不可无证据漂移 | `src/store.ts`、`src/engine/`、`src/data/demoCases.ts`、`src/domain/` | 对应 engine 单测 + 受影响案例回归；算法变化须核对案例锚点 |
-| 控制类人工确认、PlanningGap 禁止下发、预案版本留痕 | `src/store.ts`、`src/engine/planBuilder.ts`、`src/engine/tms.ts`、预案组件 | 状态机/预案测试；确认、打回、作废、替换的审计可见性 |
-| 建议等级与人工等级分离，L3/L4 审批不可绕过 | `src/domain/monitoring.ts`、`src/monitoring/store.ts`、`verificationMachine.ts`、核实组件 | 核实状态机、权限和详情抽屉测试 |
-| 接管必须幂等、有序、可追溯，不能以重试制造重复事件 | `handoffRules.ts`、`controlBridge.ts`、`crossModuleSync.ts`、`monitoringDb.ts` | handoff、同步、仓储幂等和跨模块集成测试 |
-| 本地持久化不可静默丢失；审计只增不改 | `services/persistence.ts`、`monitoringDb.ts`、两个 Store | 持久化/仓储测试；降级提示与刷新恢复检查 |
-| LLM、地图、视频等依赖失败必须显式降级，且不能编造数据 | `services/llm.ts`、`monitoring/engine/degradation.ts`、运行时与韧性组件 | Schema/值级校验、降级分支和 UI 提示测试 |
-| 真实数据、敏感信息和生产凭证不得进入仓库或导出物 | `.env.local`、案例、夹具、日志、导出与文档 | 变更前后检查 `git diff`；确认 `.gitignore` 和敏感内容扫描结果 |
-| 产品契约、验收口径和架构约束变化必须可追溯 | 相关 PRD、验收报告、代码修改日志、本文件 | 文档差异审查；交付说明列出同步/未同步文档 |
+| 约束 | 影响区域 | 最低验证 | 证据来源 |
+| --- | --- | --- | --- |
+| 事件归并、推理、流量、预案和五案例锚点不可无证据漂移 | `src/store.ts`、`src/engine/`、`src/data/demoCases.ts`、`src/domain/` | 对应 engine 单测 + 受影响案例回归；算法变化须核对案例锚点 | `engine/*.test.ts`、`demoCases.test.ts`、`事件案例/五个案例.md` |
+| 控制类人工确认、PlanningGap 禁止下发、预案版本留痕 | `src/store.ts`、`src/engine/planBuilder.ts`、`src/engine/tms.ts`、预案组件 | 状态机/预案测试；确认、打回、作废、替换的审计可见性 | `planBuilder.ts`、`stateMachine.ts`、`tms.test.ts`、MVP SRS |
+| 建议等级与人工等级分离，L3/L4 审批不可绕过 | `src/domain/monitoring.ts`、`src/monitoring/store.ts`、`verificationMachine.ts`、核实组件 | 核实状态机、权限和详情抽屉测试 | `monitoring.ts`、`verificationMachine.test.ts`、`permissions.test.ts`、事件监测 PRD v0.3 |
+| 接管必须幂等、有序、可追溯，不能以重试制造重复事件 | `handoffRules.ts`、`controlBridge.ts`、`crossModuleSync.ts`、`monitoringDb.ts` | handoff、同步、仓储幂等和跨模块集成测试 | `controlBridge.test.ts`、`monitoringDb.test.ts`、`crossModuleSync.integration.test.ts` |
+| 本地持久化不可静默丢失；审计只增不改 | `services/persistence.ts`、`monitoringDb.ts`、两个 Store | 持久化/仓储测试；降级提示与刷新恢复检查 | `persistence.test.ts`、`monitoringDb*.test.ts`、`degradationUi.test.tsx` |
+| LLM、地图、视频等依赖失败必须显式降级，且不能编造数据 | `services/llm.ts`、`monitoring/engine/degradation.ts`、运行时与韧性组件 | Schema/值级校验、降级分支和 UI 提示测试 | `llm.test.ts`、`degradation.test.ts`、`degradationUi.test.tsx`、`amapLoader.test.ts` |
+| 真实数据、敏感信息和生产凭证不得进入仓库或导出物 | `.env.local`、案例、夹具、日志、导出与文档 | 变更前后检查 `git diff`；确认忽略规则和敏感内容扫描结果 | 本 Harness 数据红线、本次治理任务约束、`demo/.gitignore` |
+| 产品契约、验收口径和架构约束变化必须可追溯 | 相关 PRD、验收报告、代码修改日志、本文件 | 文档差异审查；交付说明列出同步/未同步文档 | 本 Harness 维护规则、产品文档与代码修改日志 |
 
 ---
 
@@ -407,5 +425,6 @@ flowchart LR
 
 | 日期 | 更新内容 | 依据 |
 | --- | --- | --- |
+| 2026-09-02（本轮） | 刷新到 `359f1de`；补充实现状态矩阵、四列高风险约束索引、当前测试/build 证据与 2 条 lint 警告；同步根 README 的事件监测与目录现状 | 当前 Git 状态与提交差异、`demo/src`、`package.json`、94 文件/403 用例全量测试、TypeScript/Vite build |
 | 2026-09-02 | 将旧“项目熟悉度总结”重构为 Harness + Memory；补充三模块应用壳、事件监测架构、双持久化、跨模块契约、当前脏工作区、历史验收边界、风险区域和 Codex 协议 | 当前 `demo/src`、`package.json`、`git status`、事件监测 PRD v0.3、阶段11验收报告 v0.2、代码修改日志 |
 | 2026-08-24 | 原项目熟悉度总结 | 当时 README、产品文档、demo 源码、事件案例和修改日志 |
