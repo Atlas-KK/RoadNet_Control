@@ -2,8 +2,8 @@
 
 > **用途**：本文件是项目的工程 Harness + Long-term Memory。后续 Codex 在分析、修改或验证代码前，应先阅读本文件，再按文中的证据优先级和工作协议开展任务。
 >
-> **最后核查**：2026-09-02（Asia/Shanghai）
-> **代码基线**：`main` / `359f1de`（`事件监测模块前端改造`）
+> **最后核查**：2026-09-03（Asia/Shanghai）
+> **仓库基线**：`main` / `ac221aa`（`readme`）；最近业务代码提交为 `359f1de`（`事件监测模块前端改造`）
 > **工作区状态**：存在未提交修改；本文件不代表这些修改已经验收或可提交。
 > **适用范围**：仓库根目录、`demo/` 前端 MVP、事件监测子模块及配套产品/验收文档。
 > **可信度规则**：当前代码与测试 > 当前 Git 状态 > 已批准产品/验收文档 > 历史 README 和变更日志。无法由代码确认的内容必须标为“待确认”或“历史结论”。
@@ -100,7 +100,7 @@
 
 ### 3.1 版本与工作区
 
-截至本次核查，当前分支为 `main`，最近提交为 `359f1de`。开始核查时，已跟踪文件无未提交改动，仅有用户本地的未跟踪文件 `.claude/settings.local.json`；本次任务不读取、不修改该文件。提交 `359f1de` 已包含事件监测详情抽屉、证据预览、人工核实表单、降级文案、UI 快照兼容和相应测试的改造。
+截至本次核查，当前分支为 `main`，最近提交为仅修改根 README 的 `ac221aa`；业务代码仍停留在 `359f1de`。开始核查时，已跟踪文件无未提交改动，仅有用户本地的未跟踪文件 `.claude/settings.local.json`；本次任务不读取、不修改该文件。提交 `359f1de` 已包含事件监测详情抽屉、证据预览、人工核实表单、降级文案、UI 快照兼容和相应测试的改造。
 
 本次任务只更新根目录 `README_FOR_AI.md` 与 `README.md`。任何后续任务仍须先运行 `git status --short`，重新识别并保留用户改动。
 
@@ -117,7 +117,7 @@
 
 `产品文档/事件监测模块_阶段11全量验收与交付报告_v0.2.md` 记录的历史结论是：P0 代码链路和自动化验收通过；26 条 AC 中 24 条通过、AC-18 部分通过、AC-19（真实浏览器连续 2 小时稳定性）未完成。浏览器视觉、响应式、真实时延和 2 小时墙钟验收不可宣称完成。
 
-本次核查使用 Codex 工作区提供的 Node.js 直接调用本地 CLI，完成了与 `npm run check` 相同的 lint → Vitest → TypeScript → Vite build 门禁：
+本次核查在 `ac221aa` 上使用 Codex 工作区提供的 Node.js 直接调用本地 CLI，完成了与 `npm run check` 相同的 lint → Vitest → TypeScript → Vite build 门禁。`ac221aa` 相对已测试的业务代码提交 `359f1de` 只修改文档：
 
 - 事件监测前端改造定向回归：6 个测试文件、18 项用例通过；
 - 全量 Vitest：94 个测试文件、403 项用例通过；
@@ -133,7 +133,7 @@
 | 能力 | 当前状态 | 证据与边界 |
 | --- | --- | --- |
 | 三模块应用壳、事件监测、智能管控主链 | 已实现（代码确认） | `App.tsx`、两个 Store、engine/services、当前全量测试 |
-| 24 条默认监测事件与六类专项场景 | 已实现的演示能力 | `defaultMonitoringEvents.ts`、`demoScenarios.ts` 及对应测试；均为模拟数据 |
+| 24 条默认监测事件与六类专项场景 | 已实现的演示能力 | `demo/src/monitoring/adapters/defaultMonitoringEvents.ts`、`demo/src/monitoring/adapters/demoScenarios.ts` 及对应测试；均为模拟数据 |
 | 事件核实详情、权限门禁、等级确认与历史追加 | 已实现（代码确认） | `VerificationPanel.tsx`、`verificationMachine.ts`、Store 与组件/状态机测试 |
 | IndexedDB/localStorage、接管桥和跨模块总线 | 已实现的本地 MVP 能力 | 浏览器本地持久化与内存消息总线，不提供跨浏览器或服务端可靠性 |
 | 高德地图与 OpenAI 兼容 LLM | 部分实现 / 可选增强（已确认） | 依赖外部配置；失败时走示意图、本地规则或显式降级 |
@@ -175,7 +175,7 @@ npm run audit:deps
 
 ### 4.2 配置与安全
 
-- 本地配置入口为 `demo/.env.local`（参考 `.env.local.example`）；地图和 LLM 均是可选增强。
+- 本地配置入口为 `demo/.env.local`；`demo/.env.local.example` 当前只预置 LLM 配置，地图所需的 `VITE_AMAP_KEY` 与 `VITE_AMAP_SECURITY_JS_CODE` 见根 `README.md`。地图和 LLM 均是可选增强。
 - 前端环境变量会暴露到浏览器，只适合本地演示；生产调用必须迁移到服务端代理。
 - `.env.local` 与 `demo/API KEY.txt` 不可提交；变更环境变量后重启 Vite。
 
@@ -425,6 +425,7 @@ flowchart LR
 
 | 日期 | 更新内容 | 依据 |
 | --- | --- | --- |
-| 2026-09-02（本轮） | 刷新到 `359f1de`；补充实现状态矩阵、四列高风险约束索引、当前测试/build 证据与 2 条 lint 警告；同步根 README 的事件监测与目录现状 | 当前 Git 状态与提交差异、`demo/src`、`package.json`、94 文件/403 用例全量测试、TypeScript/Vite build |
+| 2026-09-03（本轮） | 刷新仓库基线到 `ac221aa`，区分仓库提交与业务代码提交；补全默认事件/专项场景的证据路径、明确地图配置不在当前 env 示例内，并复跑质量门禁 | `git status/log/diff`、代码/配置/测试/TODO 扫描、6 文件/18 用例定向测试、94 文件/403 用例全量测试、Oxlint、TypeScript、Vite build |
+| 2026-09-02 | 刷新到 `359f1de`；补充实现状态矩阵、四列高风险约束索引、当前测试/build 证据与 2 条 lint 警告；同步根 README 的事件监测与目录现状 | 当前 Git 状态与提交差异、`demo/src`、`package.json`、94 文件/403 用例全量测试、TypeScript/Vite build |
 | 2026-09-02 | 将旧“项目熟悉度总结”重构为 Harness + Memory；补充三模块应用壳、事件监测架构、双持久化、跨模块契约、当前脏工作区、历史验收边界、风险区域和 Codex 协议 | 当前 `demo/src`、`package.json`、`git status`、事件监测 PRD v0.3、阶段11验收报告 v0.2、代码修改日志 |
 | 2026-08-24 | 原项目熟悉度总结 | 当时 README、产品文档、demo 源码、事件案例和修改日志 |

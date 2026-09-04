@@ -49,7 +49,7 @@ npm run dev
 
 应用不配置外部服务也可体验本地模板和核心业务流程；地图底图及大模型增强需要单独配置。
 
-复制 `demo/.env.local.example` 为 `demo/.env.local`，按需填写：
+复制 `demo/.env.local.example` 为 `demo/.env.local`，再按需补充或填写。示例文件当前预置 LLM 配置；如需高德地图，还需加入下列两个 `VITE_AMAP_*` 配置项：
 
 ```env
 # 高德地图 JavaScript API 2.0
@@ -150,7 +150,7 @@ npm run audit:deps  # 使用官方 npm registry 检查依赖漏洞
 - 新增或修改纯函数时同步补充 Vitest 测试。
 - 不在源码、案例、日志或导出物中写入真实密钥、生产电话号码和敏感调度数据。
 
-当前验证快照（2026-09-02，`main` / `359f1de`）：事件监测定向回归 6 个测试文件、18 项用例通过；全量 Vitest 94 个测试文件、403 项用例通过；TypeScript 检查和 Vite 生产构建通过。Oxlint 无错误，仍有 2 条既有 React 警告（`EventTriageList.tsx` 的渲染期 `Date.now()` 与 `TrafficFlowMonitor.tsx` 的渲染期 ref 读取）。浏览器视觉、响应式、真实时延和连续 2 小时稳定性尚未完成当前验收。
+当前验证快照（2026-09-03，`main` / `ac221aa`；业务代码仍为 `359f1de`）：事件监测定向回归 6 个测试文件、18 项用例通过；全量 Vitest 94 个测试文件、403 项用例通过；TypeScript 检查和 Vite 生产构建通过。Oxlint 无错误，仍有 2 条既有 React 警告（`EventTriageList.tsx` 的渲染期 `Date.now()` 与 `TrafficFlowMonitor.tsx` 的渲染期 ref 读取）。浏览器视觉、响应式、真实时延和连续 2 小时稳定性尚未完成当前验收。
 
 ## 相关文档
 
